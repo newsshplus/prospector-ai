@@ -353,6 +353,19 @@ function scoreLetter(classificacao){
   return 'C';
 }
 
+function prioLetter(prioridade, intentScore){
+  if(prioridade){
+    if(prioridade.startsWith('Alta')) return 'A';
+    if(prioridade.startsWith('Média')) return 'B';
+    return 'C';
+  }
+  if(typeof intentScore === 'number'){
+    if(intentScore > 80) return 'A';
+    if(intentScore >= 50) return 'B';
+  }
+  return 'C';
+}
+
 let currentLeads = [];
 
 async function loadLeads(){
@@ -380,15 +393,26 @@ function renderLeads(){
     wrap.innerHTML = '<div class="empty">Ainda não há leads nesta base.</div>';
     return;
   }
-  let html = '<table><thead><tr><th>Empresa</th><th>Score</th><th>Dor identificada</th><th>Status</th><th></th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th>Empresa</th><th>ICP</th><th>Intent</th><th>Dor identificada</th><th>Status</th><th></th></tr></thead><tbody>';
   currentLeads.forEach((l, i) => {
     const letter = scoreLetter(l['Classificação']);
+    const intentScore = l['Intent Score'];
+    const prio = l['Prioridade de Disparo'];
+    const intentLetter = prioLetter(prio, intentScore);
+    const intentCell = (intentScore !== undefined && intentScore !== null)
+      ? '<span class="badge ' + intentLetter + '">' + intentScore + '</span>'
+      : '<span class="dor">—</span>';
     html += '<tr>' +
-      '<td><div class="empresa">' + esc(l.Empresa || '—') + '</div><div class="dor">' + esc(l.Website || l['Google Maps'] || '') + '</div></td>' +
+      '<td><div class="empresa">' + esc(l.Empresa || '—') + '</div><div class="dor">' + esc(l.Website || l['Google Maps'] || '') + '</div>' +
+      (l.Cargo || l.Decisor ? '<div class="dor">' + esc([l.Decisor, l.Cargo].filter(Boolean).join(' · ')) + '</div>' : '') + '</td>' +
       '<td><span class="badge ' + letter + '">' + (l['ICP Score'] ?? '—') + '</span></td>' +
+      '<td>' + intentCell + '</td>' +
       '<td class="dor">' + esc(l['Dor Identificada'] || '—') + '</td>' +
       '<td>' + esc(l.Status || 'Novo') + '</td>' +
-      '<td><button class="btn-ghost btn-small" onclick="openOutreach(' + i + ')">Gerar abordagens</button></td>' +
+      '<td style="white-space:nowrap;">' +
+        '<button class="btn-ghost btn-small" onclick="openEnrich(' + i + ')">Enriquecer</button> ' +
+        '<button class="btn-ghost btn-small" onclick="openOutreach(' + i + ')">Abordagens</button>' +
+      '</td>' +
       '</tr>';
   });
   html += '</tbody></table>';
@@ -397,6 +421,42 @@ function renderLeads(){
 
 function esc(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function openEnrich(i){
+  const lead = currentLeads[i];
+  const { baseId, tableId } = getAirtable();
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = 'Enriquecimento BANT+ e tech stack';
+  document.getElementById('m-body').innerHTML = 'A investigar decisor, urgência e tech stack (pesquisa web)… pode demorar 20-40s.';
+  document.getElementById('modal-bg').classList.add('show');
+
+  try{
+    const r = await fetch('/api/enrich', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ lead, businessProfile: getProfile(), baseId, tableId, recordId: lead.id })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderEnrich(data.enrichment);
+    loadLeads();
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderEnrich(e){
+  const body = document.getElementById('m-body');
+  const letter = prioLetter(e.prioridade, e.intentScore);
+  let html = '<div class="block"><div class="label">Intent Score</div>' +
+    '<pre><span class="badge ' + letter + '" style="font-size:16px;">' + e.intentScore + '</span> — ' + esc(e.prioridade || '') + '</pre></div>';
+  html += '<div class="block"><div class="label">Decisor-chave</div><pre>' + esc([e.decisorChave, e.cargo].filter(Boolean).join(' · ') || 'Não identificado') + '</pre></div>';
+  html += '<div class="block"><div class="label">Authority</div><pre>' + esc(e.authority || '—') + '</pre></div>';
+  html += '<div class="block"><div class="label">Need — 3 falhas identificadas</div><pre>' + esc((e.need || []).map((n,i)=> (i+1)+'. '+n).join('\n')) + '</pre></div>';
+  html += '<div class="block"><div class="label">Timeline / urgência</div><pre>' + esc(e.timeline || '—') + '</pre></div>';
+  html += '<div class="block"><div class="label">Budget estimado</div><pre>' + esc(e.budget || '—') + '</pre></div>';
+  html += '<div class="block"><div class="label">Tech stack</div><pre>' + esc((e.techStack || []).join(', ') || '—') + '</pre></div>';
+  body.innerHTML = html;
 }
 
 async function openOutreach(i){

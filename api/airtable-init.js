@@ -40,6 +40,22 @@ const FIELDS = [
   },
   { name: 'Dor Identificada', type: 'multilineText' },
   { name: 'Próxima Ação', type: 'singleLineText' },
+  { name: 'Cargo', type: 'singleLineText' },
+  { name: 'Techs Utilizadas', type: 'multilineText' },
+  { name: 'Fator de Urgência', type: 'multilineText' },
+  { name: 'Budget Estimado', type: 'singleLineText' },
+  { name: 'Intent Score', type: 'number', options: { precision: 0 } },
+  {
+    name: 'Prioridade de Disparo',
+    type: 'singleSelect',
+    options: {
+      choices: [
+        { name: 'Alta - Disparo imediato', color: 'redBright' },
+        { name: 'Média - Fila padrão', color: 'yellowBright' },
+        { name: 'Desqualificado', color: 'grayBright' },
+      ],
+    },
+  },
   { name: 'WhatsApp Msg 1', type: 'multilineText' },
   { name: 'WhatsApp Msg 2', type: 'multilineText' },
   { name: 'Email Assunto', type: 'singleLineText' },
