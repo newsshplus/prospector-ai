@@ -145,6 +145,130 @@ export async function airtableEnsureFields(baseId, tableId, desiredFields) {
   }
 }
 
+// --- Fontes de scraping de fallback (quando o Apify falha/está indisponível) ---
+
+const SKIP_DOMAINS = /facebook\.com|instagram\.com|linkedin\.com|yelp\.|tripadvisor\.|wikipedia\.org|youtube\.com|pagesamarelas\.pt|maps\.google|twitter\.com|x\.com|indeed\.com|glassdoor\./i;
+
+export async function scrapeDuckDuckGo(niche, zone, maxResults) {
+  const cheerio = await import('cheerio');
+  const query = `${niche} ${zone}`;
+  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProspectorAI/1.0)' } });
+  if (!r.ok) return [];
+  const html = await r.text();
+  const $ = cheerio.load(html);
+  const results = [];
+  const seen = new Set();
+
+  $('.result__body').each((_, el) => {
+    if (results.length >= maxResults) return;
+    const titleEl = $(el).find('.result__a').first();
+    const title = titleEl.text().trim();
+    let href = titleEl.attr('href') || '';
+    const m = href.match(/uddg=([^&]+)/);
+    if (m) href = decodeURIComponent(m[1]);
+    if (!title || !href) return;
+    let domain;
+    try { domain = new URL(href).hostname.replace(/^www\./, ''); } catch { return; }
+    if (SKIP_DOMAINS.test(domain) || seen.has(domain)) return;
+    seen.add(domain);
+    results.push({
+      empresa: title,
+      website: href,
+      telefone: '',
+      categoria: '',
+      endereco: '',
+      cidade: zone,
+      googleMaps: '',
+      rating: null,
+      reviews: null,
+    });
+  });
+  return results;
+}
+
+// Nota: a Custom Search JSON API da Google está fechada a novos registos desde 2025
+// e será totalmente descontinuada em 1 jan 2027. Só funciona aqui se já tiveres
+// GOOGLE_CSE_KEY/GOOGLE_CSE_CX de um projeto Google Cloud criado antes disso.
+export async function scrapeGoogleCSE(niche, zone, maxResults) {
+  if (!process.env.GOOGLE_CSE_KEY || !process.env.GOOGLE_CSE_CX) return [];
+  const url = new URL('https://www.googleapis.com/customsearch/v1');
+  url.searchParams.set('key', process.env.GOOGLE_CSE_KEY);
+  url.searchParams.set('cx', process.env.GOOGLE_CSE_CX);
+  url.searchParams.set('q', `${niche} ${zone}`);
+  url.searchParams.set('num', String(Math.min(maxResults, 10)));
+  const r = await fetch(url);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return (data.items || [])
+    .filter((item) => { try { return !SKIP_DOMAINS.test(new URL(item.link).hostname); } catch { return false; } })
+    .map((item) => ({
+      empresa: item.title,
+      website: item.link,
+      telefone: '',
+      categoria: '',
+      endereco: '',
+      cidade: zone,
+      googleMaps: '',
+      rating: null,
+      reviews: null,
+    }));
+}
+
+// --- Pontuação ICP (Claude) + gravação em lote no Airtable — partilhado por todos os modos de scraping ---
+
+const ICP_SYSTEM = `És um analista sénior de qualificação de leads B2B (ICP Match Engine).
+Recebes o perfil do negócio do utilizador e uma lista de empresas encontradas no mercado.
+Para CADA empresa, calcula um ICP score e classifica-a.
+Responde APENAS com um array JSON válido, sem texto antes ou depois, sem markdown.
+Formato de cada item: {"index": number, "score": number (0-100), "classificacao": "Score A - Hot" | "Score B - Warm" | "Score C - Cold", "dor": string (1 frase, a dor/gap real que o serviço do utilizador resolve), "proximaAcao": string (1 frase, ex: "Contactar via WhatsApp esta semana")}.
+Critérios: Score A (85-100) = gaps claros que o serviço resolve imediatamente, boa maturidade digital/orçamental. Score B (60-84) = perfil ideal mas sem dor urgente explícita. Score C (<60) = fora do segmento ou sem potencial — ainda assim inclui no array.
+Escreve "dor" e "proximaAcao" em português europeu (PT-PT), sem brasileirismos.`;
+
+async function scoreBatchWithClaude(businessProfile, leads) {
+  const prompt = `PERFIL DO MEU NEGÓCIO:
+${JSON.stringify(businessProfile, null, 2)}
+
+EMPRESAS ENCONTRADAS (array, usa o "index" de cada uma na tua resposta):
+${JSON.stringify(leads.map((l, i) => ({ index: i, ...l })), null, 2)}
+
+Responde só com o array JSON.`;
+  const text = await callClaude({ system: ICP_SYSTEM, prompt, maxTokens: 4000 });
+  return parseJsonLoose(text);
+}
+
+export async function scoreAndSaveLeads(baseId, tableId, businessProfile, leads) {
+  if (!leads.length) return { saved: 0, total: 0 };
+
+  const scored = [];
+  const BATCH = 15;
+  for (let i = 0; i < leads.length; i += BATCH) {
+    const chunk = leads.slice(i, i + BATCH);
+    const results = await scoreBatchWithClaude(businessProfile, chunk);
+    for (const r of results) {
+      const lead = chunk[r.index];
+      if (lead) scored.push({ ...lead, ...r });
+    }
+  }
+
+  const records = scored.map((s) => ({
+    Empresa: s.empresa,
+    Website: s.website || undefined,
+    Telefone: s.telefone || undefined,
+    'ICP Score': s.score,
+    Classificação: s.classificacao,
+    'Dor Identificada': s.dor,
+    'Próxima Ação': s.proximaAcao,
+    'Google Maps': s.googleMaps || undefined,
+    Rating: s.rating ?? undefined,
+    Reviews: s.reviews ?? undefined,
+    Status: 'Novo',
+  }));
+
+  const created = await airtableCreateRecords(baseId, tableId, records);
+  return { saved: created.length, total: leads.length };
+}
+
 export function parseJsonLoose(text) {
   const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
   return JSON.parse(cleaned);

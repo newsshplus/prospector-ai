@@ -5,5 +5,8 @@
   "type": "module",
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
   }
 }

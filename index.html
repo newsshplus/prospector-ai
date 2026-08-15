@@ -316,6 +316,20 @@ async function runScrape(){
     const start = await startR.json();
     if(!startR.ok) throw new Error(start.error);
 
+    if(start.mode === 'sync'){
+      const sourceLabel = start.source === 'duckduckgo' ? 'DuckDuckGo' : 'Google Custom Search';
+      setStatus('sc-status', 'Apify indisponível — a usar fallback (' + sourceLabel + '), ' + start.leads.length + ' resultados. A pontuar com IA…');
+      const finishR = await fetch('/api/scrape-finish-sync', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ leads: start.leads, baseId, tableId, businessProfile: profile })
+      });
+      const finish = await finishR.json();
+      if(!finishR.ok) throw new Error(finish.error);
+      setStatus('sc-status', finish.saved + ' leads gravados via fallback (' + sourceLabel + '). Nota: menos completos que o Apify (sem telefone/rating).', 'ok');
+      loadLeads();
+      return;
+    }
+
     let status, datasetId;
     while(true){
       await new Promise(r => setTimeout(r, 4000));

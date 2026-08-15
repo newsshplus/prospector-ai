@@ -26,19 +26,30 @@ O perfil do negócio e o Base/Table ID ficam guardados no `localStorage` do brow
 
 ## Limitações da v1 (próximos passos sugeridos)
 
-- Scraping usa só o Apify (fallback DuckDuckGo/Bing do prompt original não está implementado).
+- **Cadeia de fallback de scraping** (primário Apify → secundário DuckDuckGo → terciário Google Custom Search):
+  - O **DuckDuckGo é grátis e não precisa de chave**, mas devolve menos campos que o Apify (sem telefone, rating, reviews — só empresa + website, a partir de resultados de pesquisa web).
+  - A **Bing Search API foi totalmente descontinuada pela Microsoft em 11 de agosto de 2025** — não existe alternativa gratuita da Microsoft hoje, por isso não está implementada.
+  - A **Google Custom Search JSON API está fechada a novos registos desde 2025** e será descontinuada em 1 de janeiro de 2027 — só funciona aqui se já tiveres `GOOGLE_CSE_KEY` + `GOOGLE_CSE_CX` de um projeto Google Cloud criado antes do fecho. Se não tiveres, o sistema salta este passo automaticamente.
+  - Quando o Apify falha (chave em falta, rate limit, erro), o sistema cai automaticamente para o DuckDuckGo sem intervenção manual.
 - Sem autenticação — qualquer pessoa com o URL do deploy consegue usar o painel. Para produção, adicionar Vercel Authentication ou uma password simples no frontend.
-- Filtragem por país é opcional e best-effort (via geocoding).
+- Filtragem por país é opcional e best-effort (via geocoding), e só se aplica ao caminho do Apify.
 - ICP scoring é feito em lotes de 15 leads por chamada à API da Claude, para manter os prompts pequenos.
+
+## Variáveis de ambiente opcionais (fallback de scraping)
+
+| Variável | Necessária para |
+|---|---|
+| `GOOGLE_CSE_KEY` + `GOOGLE_CSE_CX` | Terciário — só se já tiveres um projeto Google Custom Search existente |
 
 ## Estrutura
 
 ```
 index.html              → dashboard (frontend, sem build)
 api/airtable-init.js     → cria a base Airtable com o schema completo
-api/scrape-start.js      → inicia o scraping no Apify (Google Maps)
-api/scrape-status.js     → consulta o estado do scraping
-api/scrape-finish.js     → busca resultados, pontua com IA, grava no Airtable
+api/scrape-start.js      → inicia o scraping (Apify → fallback DuckDuckGo → fallback Google CSE)
+api/scrape-status.js     → consulta o estado do scraping (modo Apify)
+api/scrape-finish.js     → busca resultados do Apify, pontua com IA, grava no Airtable
+api/scrape-finish-sync.js → pontua com IA e grava leads vindos do fallback (DuckDuckGo/Google)
 api/leads.js             → lista os leads da base para o dashboard
 api/outreach.js          → gera WhatsApp/Email/script de ligação para um lead
 api/_lib.js              → helpers partilhados (Airtable, Claude API)
