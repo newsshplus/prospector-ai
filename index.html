@@ -425,7 +425,8 @@ function renderLeads(){
       '<td>' + esc(l.Status || 'Novo') + '</td>' +
       '<td style="white-space:nowrap;">' +
         '<button class="btn-ghost btn-small" onclick="openEnrich(' + i + ')">Enriquecer</button> ' +
-        '<button class="btn-ghost btn-small" onclick="openOutreach(' + i + ')">Abordagens</button>' +
+        '<button class="btn-ghost btn-small" onclick="openOutreach(' + i + ')">Abordagens</button> ' +
+        '<button class="btn-ghost btn-small" onclick="openDeliverability(' + i + ')">Qualidade</button>' +
       '</td>' +
       '</tr>';
   });
@@ -470,6 +471,64 @@ function renderEnrich(e){
   html += '<div class="block"><div class="label">Timeline / urgência</div><pre>' + esc(e.timeline || '—') + '</pre></div>';
   html += '<div class="block"><div class="label">Budget estimado</div><pre>' + esc(e.budget || '—') + '</pre></div>';
   html += '<div class="block"><div class="label">Tech stack</div><pre>' + esc((e.techStack || []).join(', ') || '—') + '</pre></div>';
+  body.innerHTML = html;
+}
+
+async function openDeliverability(i){
+  const lead = currentLeads[i];
+  const { baseId, tableId } = getAirtable();
+  const idioma = document.getElementById('sc-lang').value;
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = 'Qualidade das mensagens e entregabilidade de email';
+  document.getElementById('m-body').innerHTML = 'A gerar variações e a verificar o domínio de email…';
+  document.getElementById('modal-bg').classList.add('show');
+
+  try{
+    const r = await fetch('/api/deliverability', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderDeliverability(data);
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function checkBadge(ok){
+  return '<span class="badge ' + (ok ? 'A' : 'C') + '">' + (ok ? 'OK' : 'em falta') + '</span>';
+}
+
+function renderDeliverability(data){
+  const body = document.getElementById('m-body');
+  const ec = data.emailCheck;
+  let html = '';
+
+  if(ec && ec.domain){
+    html += '<div class="block"><div class="label">Verificação do domínio de email (' + esc(ec.domain) + ')</div>' +
+      '<pre>MX ' + checkBadge(ec.mx) + '   SPF ' + checkBadge(ec.spf) + '   DMARC ' + checkBadge(ec.dmarc) + '   DKIM ' + checkBadge(!!ec.dkimSelectorFound) + '\n' +
+      (ec.notes && ec.notes.length ? '\n' + ec.notes.join('\n') : '') +
+      '\n\nNota: a verificação de DKIM é best-effort (só testa seletores comuns) — a ausência de deteção não prova que o DKIM está mal configurado.' +
+      '</pre></div>';
+  } else {
+    html += '<div class="block"><div class="label">Email</div><pre>Este lead não tem email registado — sem verificação de domínio.</pre></div>';
+  }
+
+  if(data.avisos && data.avisos.length){
+    html += '<div class="block"><div class="label">Avisos</div><pre class="status-line err" style="white-space:pre-wrap;">' + esc(data.avisos.join('\n')) + '</pre></div>';
+  }
+
+  (data.whatsappVariacoes || []).forEach((v, idx) => {
+    html += '<div class="block"><div class="label"><span>WhatsApp — variação ' + (idx+1) + '</span>' +
+      '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(v) + '">copiar</button></div>' +
+      '<pre>' + esc(v) + '</pre></div>';
+  });
+
+  html += '<div class="block"><div class="label"><span>Email — plain text</span>' +
+    '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(data.emailPlainText) + '">copiar</button></div>' +
+    '<pre>' + esc(data.emailPlainText) + '</pre></div>';
+
   body.innerHTML = html;
 }
 

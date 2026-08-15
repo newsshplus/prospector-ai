@@ -269,6 +269,72 @@ export async function scoreAndSaveLeads(baseId, tableId, businessProfile, leads)
   return { saved: created.length, total: leads.length };
 }
 
+// --- Verificação técnica de entregabilidade de email (MX / SPF / DMARC / DKIM best-effort) ---
+
+const DKIM_COMMON_SELECTORS = ['google', 'selector1', 'selector2', 'k1', 'mandrill', 'everlytickey1', 'default'];
+
+export async function checkEmailDeliverability(email) {
+  const result = { email, syntaxOk: false, domain: null, mx: false, spf: false, dmarc: false, dkimSelectorFound: null, notes: [] };
+  if (!email) return result;
+
+  const syntaxRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  result.syntaxOk = syntaxRe.test(email);
+  if (!result.syntaxOk) {
+    result.notes.push('Sintaxe de email inválida.');
+    return result;
+  }
+
+  const domain = email.split('@')[1];
+  result.domain = domain;
+
+  const dns = await import('node:dns/promises');
+
+  try {
+    const mx = await dns.resolveMx(domain);
+    result.mx = mx.length > 0;
+    if (!result.mx) result.notes.push('Sem registos MX — domínio provavelmente não recebe email.');
+  } catch {
+    result.notes.push('Não foi possível resolver registos MX (domínio pode não existir).');
+  }
+
+  try {
+    const txt = await dns.resolveTxt(domain);
+    const flat = txt.map((t) => t.join(''));
+    result.spf = flat.some((t) => t.toLowerCase().startsWith('v=spf1'));
+    if (!result.spf) result.notes.push('Sem registo SPF encontrado no domínio.');
+  } catch {
+    result.notes.push('Não foi possível verificar SPF.');
+  }
+
+  try {
+    const txt = await dns.resolveTxt(`_dmarc.${domain}`);
+    const flat = txt.map((t) => t.join(''));
+    result.dmarc = flat.some((t) => t.toLowerCase().startsWith('v=dmarc1'));
+    if (!result.dmarc) result.notes.push('Sem registo DMARC encontrado.');
+  } catch {
+    result.notes.push('Sem registo DMARC encontrado (_dmarc ausente).');
+  }
+
+  // DKIM: verificação best-effort por seletores comuns. A ausência aqui NÃO prova que o DKIM
+  // não está configurado — a maioria dos seletores reais são específicos do ESP e não são adivinháveis.
+  for (const selector of DKIM_COMMON_SELECTORS) {
+    try {
+      const txt = await dns.resolveTxt(`${selector}._domainkey.${domain}`);
+      if (txt.length) {
+        result.dkimSelectorFound = selector;
+        break;
+      }
+    } catch {
+      // tenta o próximo seletor
+    }
+  }
+  if (!result.dkimSelectorFound) {
+    result.notes.push('DKIM não confirmado (verificação por seletores comuns, não é conclusiva).');
+  }
+
+  return result;
+}
+
 export function parseJsonLoose(text) {
   const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
   return JSON.parse(cleaned);
