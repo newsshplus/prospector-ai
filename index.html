@@ -427,7 +427,8 @@ function renderLeads(){
         '<button class="btn-ghost btn-small" onclick="openEnrich(' + i + ')">Enriquecer</button> ' +
         '<button class="btn-ghost btn-small" onclick="openOutreach(' + i + ')">Abordagens</button> ' +
         '<button class="btn-ghost btn-small" onclick="openDeliverability(' + i + ')">Qualidade</button> ' +
-        '<button class="btn-ghost btn-small" onclick="openObjections(' + i + ')">Objeções</button>' +
+        '<button class="btn-ghost btn-small" onclick="openObjections(' + i + ')">Objeções</button> ' +
+        '<button class="btn-ghost btn-small" onclick="openCadence(' + i + ')">Cadência 21d</button>' +
       '</td>' +
       '</tr>';
   });
@@ -566,6 +567,48 @@ function renderObjections(data){
   if(data.fechamento && data.fechamento.length){
     html += '<div class="block"><div class="label">Frases de fecho (para agendar reunião)</div><pre>' +
       esc(data.fechamento.map((f,i)=> (i+1)+'. '+f).join('\n')) + '</pre></div>';
+  }
+  body.innerHTML = html;
+}
+
+async function openCadence(i){
+  const lead = currentLeads[i];
+  const { baseId, tableId } = getAirtable();
+  const idioma = document.getElementById('sc-lang').value;
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = 'Cadência de follow-up omnichannel — 21 dias';
+  document.getElementById('m-body').innerHTML = 'A desenhar a cadência de 21 dias…';
+  document.getElementById('modal-bg').classList.add('show');
+
+  try{
+    const r = await fetch('/api/cadence', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderCadence(data);
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderCadence(data){
+  const body = document.getElementById('m-body');
+  let html = '';
+  (data.cadencia || []).forEach((t) => {
+    let content = '';
+    if(t.whatsapp) content += 'WhatsApp:\n' + t.whatsapp + '\n\n';
+    if(t.roteiroLigacao) content += 'Ligação (abertura):\n' + t.roteiroLigacao + '\n\n';
+    if(t.emailAssunto) content += 'Email — ' + t.emailAssunto + ':\n' + t.emailCorpo;
+    html += '<div class="block"><div class="label"><span>Dia ' + t.dia + ' — ' + esc((t.canais||[]).join(' + ')) + '</span>' +
+      '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(content.trim()) + '">copiar</button></div>' +
+      '<pre>' + esc(content.trim()) + '</pre></div>';
+  });
+  if(data.regraParagem){
+    html += '<div class="block"><div class="label">Regra de paragem</div><pre>' + esc(data.regraParagem.descricao) +
+      '\n\nEsta regra tem de ser implementada no teu n8n (ouvir respostas inbound e cancelar os toques seguintes). Payload de exemplo para a tarefa de CRM:\n\n' +
+      esc(JSON.stringify(data.regraParagem.crmPayload, null, 2)) + '</pre></div>';
   }
   body.innerHTML = html;
 }
