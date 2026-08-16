@@ -35,7 +35,7 @@ export default async function handler(req, res) {
 
   try {
     requireAuth(req);
-    requireEnv(['AIRTABLE_TOKEN', 'ANTHROPIC_API_KEY']);
+    requireEnv(['AIRTABLE_TOKEN']); // o relatório tenta Groq primeiro; só precisa da Claude se a Groq não estiver configurada
     const { baseId, tableId, custoMensal } = req.query;
     if (!baseId || !tableId) return res.status(400).json({ error: 'baseId e tableId são obrigatórios' });
 

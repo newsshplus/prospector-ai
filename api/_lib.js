@@ -237,8 +237,13 @@ export async function callAI({ system, prompt, maxTokens = 2000, webSearch = fal
     try {
       return await callGroq({ system, prompt, maxTokens });
     } catch {
-      // Groq indisponível — cai para a Claude para não interromper o utilizador
+      // Groq indisponível — cai para a Claude para não interromper o utilizador (se houver chave)
     }
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error(
+      'Nenhum motor de IA disponível: configura GROQ_API_KEY_1/2/3 (grátis) ou ANTHROPIC_API_KEY na Vercel.'
+    );
   }
   return callClaude({ system, prompt, maxTokens });
 }

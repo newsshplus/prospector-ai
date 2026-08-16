@@ -35,7 +35,7 @@ export default async function handler(req, res) {
 
   try {
     requireAuth(req);
-    requireEnv(['AIRTABLE_TOKEN', 'ANTHROPIC_API_KEY']);
+    requireEnv(['AIRTABLE_TOKEN']); // ICP scoring tenta Groq primeiro; só precisa da Claude se a Groq não estiver configurada
     const { datasetId, leads: providedLeads, baseId, tableId, businessProfile, countryCode } = req.body || {};
     if (!baseId || !tableId || !businessProfile) {
       return res.status(400).json({ error: 'baseId, tableId e businessProfile são obrigatórios' });
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
 
     if (!leads.length) return res.status(200).json({ saved: 0, message: 'Nenhum lead encontrado.' });
 
-    const result = await scoreAndSaveLeads(baseId, tableId, businessProfile, leads);
+    const result = await scoreAndSaveLeads(baseId, tableId, businessProfile, leads, countryCode);
     res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
