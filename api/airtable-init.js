@@ -1,4 +1,4 @@
-import { cors, airtableHeaders, requireEnv } from './_lib.js';
+import { cors, airtableHeaders, requireEnv, requireAuth } from './_lib.js';
 
 // POST { workspaceId?, name? }
 // Devolve { baseId, tableId }. Se workspaceId não for passado, tenta detetar
@@ -85,6 +85,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 
   try {
+    requireAuth(req);
     requireEnv(['AIRTABLE_TOKEN']);
     const body = req.body || {};
     const workspaceId = body.workspaceId || (await detectWorkspaceId());

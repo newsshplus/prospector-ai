@@ -1,4 +1,4 @@
-import { cors, requireEnv, airtableList, airtableEnsureFields, computeReportStats, callClaude } from './_lib.js';
+import { cors, requireEnv, requireAuth, airtableList, airtableEnsureFields, computeReportStats, callAI } from './_lib.js';
 
 const REPORT_FIELDS = [
   {
@@ -34,6 +34,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Use GET' });
 
   try {
+    requireAuth(req);
     requireEnv(['AIRTABLE_TOKEN', 'ANTHROPIC_API_KEY']);
     const { baseId, tableId, custoMensal } = req.query;
     if (!baseId || !tableId) return res.status(400).json({ error: 'baseId e tableId são obrigatórios' });
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
 
     let narrative = '';
     if (leads.length > 0) {
-      narrative = await callClaude({
+      narrative = await callAI({
         system: SYSTEM,
         prompt: `DADOS REAIS DO PIPELINE:\n${JSON.stringify(stats, null, 2)}\n\nEscreve o relatório.`,
         maxTokens: 2500,

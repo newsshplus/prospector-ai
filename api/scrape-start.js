@@ -1,4 +1,4 @@
-import { cors, requireEnv, scrapeDuckDuckGo, scrapeGoogleCSE } from './_lib.js';
+import { cors, requireEnv, requireAuth, scrapeDuckDuckGo, scrapeGoogleCSE } from './_lib.js';
 
 const ACTOR_ID = 'nwua9Gu5YrADL7ZDj'; // compass/crawler-google-places
 
@@ -65,6 +65,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 
   try {
+    requireAuth(req);
     const { niche, zone, maxResults = 60 } = req.body || {};
     if (!niche || !zone) return res.status(400).json({ error: 'niche e zone são obrigatórios' });
 

@@ -1,4 +1,4 @@
-import { cors, requireEnv, scoreAndSaveLeads } from './_lib.js';
+import { cors, requireEnv, requireAuth, scoreAndSaveLeads } from './_lib.js';
 
 function cleanPhone(raw) {
   if (!raw) return '';
@@ -34,6 +34,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 
   try {
+    requireAuth(req);
     requireEnv(['AIRTABLE_TOKEN', 'ANTHROPIC_API_KEY']);
     const { datasetId, leads: providedLeads, baseId, tableId, businessProfile, countryCode } = req.body || {};
     if (!baseId || !tableId || !businessProfile) {

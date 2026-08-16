@@ -1,4 +1,4 @@
-import { cors, requireEnv, airtableList } from './_lib.js';
+import { cors, requireEnv, requireAuth, airtableList } from './_lib.js';
 
 // GET ?baseId=...&tableId=...
 export default async function handler(req, res) {
@@ -6,6 +6,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
+    requireAuth(req);
     requireEnv(['AIRTABLE_TOKEN']);
     const { baseId, tableId } = req.query;
     if (!baseId || !tableId) return res.status(400).json({ error: 'baseId e tableId são obrigatórios' });

@@ -1,4 +1,4 @@
-import { cors, requireEnv } from './_lib.js';
+import { cors, requireEnv, requireAuth } from './_lib.js';
 
 // GET ?runId=...
 export default async function handler(req, res) {
@@ -6,6 +6,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
+    requireAuth(req);
     requireEnv(['APIFY_KEY']);
     const { runId } = req.query;
     if (!runId) return res.status(400).json({ error: 'runId é obrigatório' });

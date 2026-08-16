@@ -1,4 +1,6 @@
 // Helpers partilhados pelas funções serverless. Sem dependências externas.
+import crypto from 'node:crypto';
+
 
 export function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -83,6 +85,126 @@ export async function callClaude({ system, prompt, maxTokens = 2000, webSearch =
     .filter((b) => b.type === 'text')
     .map((b) => b.text)
     .join('\n');
+}
+
+// --- Groq: usado como primeira opção para poupar tokens da Claude em tarefas de texto
+// que não precisam de pesquisa web. Roda entre até 3 chaves (GROQ_API_KEY_1/2/3) e entre
+// modelos, e cai para a próxima chave/modelo em caso de rate limit ou erro. ---
+
+const GROQ_MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+
+function getGroqKeys() {
+  return [process.env.GROQ_API_KEY_1, process.env.GROQ_API_KEY_2, process.env.GROQ_API_KEY_3].filter(Boolean);
+}
+
+export function groqEnabled() {
+  return getGroqKeys().length > 0;
+}
+
+async function callGroqOnce({ system, prompt, maxTokens, apiKey, model }) {
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: prompt },
+      ],
+    }),
+  });
+  if (!r.ok) {
+    const err = new Error(`Groq (${model}) falhou: ${r.status} ${await r.text()}`);
+    err.groqStatus = r.status;
+    throw err;
+  }
+  const data = await r.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+export async function callGroq({ system, prompt, maxTokens = 2000 }) {
+  const keys = getGroqKeys();
+  if (!keys.length) throw new Error('Sem chaves GROQ configuradas.');
+  // ordem embaralhada de chaves para distribuir carga entre as contas
+  const shuffledKeys = [...keys].sort(() => Math.random() - 0.5);
+  let lastErr;
+  for (const apiKey of shuffledKeys) {
+    for (const model of GROQ_MODELS) {
+      try {
+        return await callGroqOnce({ system, prompt, maxTokens, apiKey, model });
+      } catch (e) {
+        lastErr = e;
+        // 429 (rate limit) ou 401/403 (chave inválida/esgotada) — tenta a próxima combinação
+      }
+    }
+  }
+  throw lastErr || new Error('Groq falhou sem detalhe.');
+}
+
+// Ponto único de entrada para geração de texto: tenta Groq primeiro (grátis, poupa tokens
+// da Claude) e só usa Claude se o Groq falhar ou se a tarefa precisar mesmo de pesquisa web
+// (a Claude tem a ferramenta de web_search embutida; o Groq não).
+export async function callAI({ system, prompt, maxTokens = 2000, webSearch = false }) {
+  if (webSearch) {
+    return callClaude({ system, prompt, maxTokens, webSearch: true });
+  }
+  if (groqEnabled()) {
+    try {
+      return await callGroq({ system, prompt, maxTokens });
+    } catch {
+      // Groq indisponível — cai para a Claude para não interromper o utilizador
+    }
+  }
+  return callClaude({ system, prompt, maxTokens });
+}
+
+// --- Autenticação simples por password (o painel tem custos de tokens de IA, por isso fica protegido) ---
+
+function sessionSecret() {
+  return process.env.SESSION_SECRET || process.env.APP_PASSWORD || 'fallback-secret-troca-isto';
+}
+
+function sign(value) {
+  return crypto.createHmac('sha256', sessionSecret()).update(value).digest('hex');
+}
+
+export function makeSessionToken() {
+  const exp = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 dias
+  const payload = String(exp);
+  return `${payload}.${sign(payload)}`;
+}
+
+function verifySessionToken(token) {
+  if (!token) return false;
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  const [payload, sig] = parts;
+  if (sig !== sign(payload)) return false;
+  return Number(payload) > Date.now();
+}
+
+function parseCookies(req) {
+  const header = req.headers?.cookie || '';
+  const out = {};
+  header.split(';').forEach((part) => {
+    const idx = part.indexOf('=');
+    if (idx === -1) return;
+    out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
+  });
+  return out;
+}
+
+export function requireAuth(req) {
+  const cookies = parseCookies(req);
+  if (!verifySessionToken(cookies.pai_session)) {
+    const err = new Error('Sessão inválida ou expirada. Faz login novamente.');
+    err.status = 401;
+    throw err;
+  }
 }
 
 // --- Deteção de tech stack via fetch direto ao site (sem depender da IA) ---
@@ -225,7 +347,7 @@ Formato de cada item: {"index": number, "score": number (0-100), "classificacao"
 Critérios: Score A (85-100) = gaps claros que o serviço resolve imediatamente, boa maturidade digital/orçamental. Score B (60-84) = perfil ideal mas sem dor urgente explícita. Score C (<60) = fora do segmento ou sem potencial — ainda assim inclui no array.
 Escreve "dor" e "proximaAcao" em português europeu (PT-PT), sem brasileirismos.`;
 
-async function scoreBatchWithClaude(businessProfile, leads) {
+async function scoreBatchWithAI(businessProfile, leads) {
   const prompt = `PERFIL DO MEU NEGÓCIO:
 ${JSON.stringify(businessProfile, null, 2)}
 
@@ -233,7 +355,7 @@ EMPRESAS ENCONTRADAS (array, usa o "index" de cada uma na tua resposta):
 ${JSON.stringify(leads.map((l, i) => ({ index: i, ...l })), null, 2)}
 
 Responde só com o array JSON.`;
-  const text = await callClaude({ system: ICP_SYSTEM, prompt, maxTokens: 4000 });
+  const text = await callAI({ system: ICP_SYSTEM, prompt, maxTokens: 4000 });
   return parseJsonLoose(text);
 }
 
@@ -244,7 +366,7 @@ export async function scoreAndSaveLeads(baseId, tableId, businessProfile, leads)
   const BATCH = 15;
   for (let i = 0; i < leads.length; i += BATCH) {
     const chunk = leads.slice(i, i + BATCH);
-    const results = await scoreBatchWithClaude(businessProfile, chunk);
+    const results = await scoreBatchWithAI(businessProfile, chunk);
     for (const r of results) {
       const lead = chunk[r.index];
       if (lead) scored.push({ ...lead, ...r });
