@@ -30,9 +30,15 @@ Botão **"🎧 Copiloto"** em cada lead: cola ou escreve a última frase que o l
 
 **Sobre áudio — nota honesta:** isto não é escuta contínua de uma chamada ao vivo (essa infraestrutura de streaming/telefonia não existe nesta stack de site estático + funções serverless gratuitas). O que existe é: gravas ou carregas um clipe de áudio curto (ex: um apontamento de voz feito durante ou logo a seguir à chamada), o sistema transcreve-o com a Whisper da Groq, e o texto alimenta o copiloto. É "quase tempo real" por lotes curtos, não streaming contínuo.
 
-## Envio para o teu CRM / WhatsApp / Email (webhook de saída)
+## Envio para o CriaHub Ads (CRM) / WhatsApp / Email (webhook de saída)
 
-Na secção de configuração, define os URLs de webhook do teu CRM, do teu provedor de WhatsApp (Evolution API / Evolution Go / Z-API) e/ou de email — são simples endpoints POST que a tua automação (n8n/Make) já deve ter, à frente do CRM que uses ("próprio CRM" ou outro). Em cada lead, o botão **"📤 Enviar para CRM"** dispara os webhooks configurados com um payload consolidado (dados do lead + todas as análises geradas: BANT+, mensagens, roteiro de objeções, cadência). Não há documentação oficial de nenhum CRM específico aqui — o payload é genérico e bem estruturado; adapta o mapeamento de campos na tua automação, tal como já fazes com outras ferramentas do teu stack.
+O CRM é o **CriaHub Ads** (o teu SaaS próprio, `newsshplus/criahubads`) — não é um produto de terceiros. Ele já tem um recetor de webhooks genérico embutido (`hub-webhook`, Supabase Edge Function) que aceita qualquer JSON e guarda-o para revisão/automação.
+
+**Como ligar:** no CriaHub Ads, vai a *Empresas → a tua organização → separador Webhooks → "Entrada (receber)" → Novo endpoint*. Dá-lhe um nome, ativa opcionalmente "Proteger com token secreto", e copia a URL gerada (termina em `/functions/v1/hub-webhook/<slug>`) — e o token, se ativaste proteção. Cola os dois na secção "Integrações de envio" do Prospector AI.
+
+Em cada lead, o botão **"📤 Enviar"** dispara um payload consolidado (lead + todas as análises: BANT+, mensagens, roteiro de objeções, cadência) para esse endpoint. Consegues ver as requisições recebidas diretamente no CriaHub Ads (mesmo separador, "Ver" → lista de requisições). O que acontece a seguir com esses dados (transformá-los em leads reais na tua tabela `leads`) depende da tua própria automação/flow dentro do CriaHub Ads — o Prospector AI só entrega os dados, não decide o que fazer com eles lá dentro.
+
+Os campos de WhatsApp/Email seguem o mesmo padrão de webhook genérico, para os teus provedores (Evolution API/Evolution Go/Z-API para WhatsApp; Resend/SendGrid para email) — cola os URLs correspondentes se os tiveres configurados.
 
 ## Variáveis de ambiente (Vercel → Project → Settings → Environment Variables)
 
@@ -71,7 +77,7 @@ O perfil do negócio, o Base/Table ID e os URLs de webhook ficam guardados no `l
 
 - **Login é de password única partilhada** — não há gestão de utilizadores nem convites.
 - **Copiloto não é streaming de áudio contínuo** — funciona por clipes curtos carregados/transcritos, não por escuta ao vivo de uma chamada em curso (essa infraestrutura de telefonia não existe nesta stack).
-- **Webhook de CRM é genérico** — sem documentação oficial de um CRM específico chamado "Pitro" ou outro, o payload é uma estrutura bem pensada mas não garantidamente compatível campo-a-campo; passa pela tua automação (n8n/Make) para mapear.
+- **Webhook de CRM aponta para o CriaHub Ads real** — não é genérico/adivinhado: usa o recetor de webhooks de entrada já existente no `newsshplus/criahubads` (`hub-webhook`). A transformação desses dados em leads reais na base do CriaHub Ads depende de automação própria desse projeto (fora do âmbito do Prospector AI).
 - **Cadeia de fallback de scraping** (primário Apify → secundário DuckDuckGo → terciário Google Custom Search):
   - O **DuckDuckGo é grátis e não precisa de chave**, mas devolve menos campos que o Apify.
   - A **Bing Search API foi totalmente descontinuada pela Microsoft em 11 de agosto de 2025** — não está implementada.

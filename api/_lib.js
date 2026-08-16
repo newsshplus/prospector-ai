@@ -61,12 +61,12 @@ export async function geocodeZone(zone) {
 // Payload genérico e bem estruturado — sem documentação oficial da API do teu CRM, isto é o formato
 // mais seguro para ligares através de uma automação (n8n/Make) que já usas noutros sítios.
 
-export async function dispatchWebhook(url, body) {
+export async function dispatchWebhook(url, body, extraHeaders = {}) {
   if (!url) return { skipped: true };
   try {
     const r = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...extraHeaders },
       body: JSON.stringify(body),
     });
     const text = await r.text().catch(() => '');
