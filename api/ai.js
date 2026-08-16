@@ -420,7 +420,7 @@ A tua missão:
 4. Para cada nicho, dá: uma justificação curta (1 frase), o termo de pesquisa exato a usar no scraping, e uma estimativa de ticket médio mensal/pontual que esse nicho normalmente paga por este tipo de serviço — SEMPRE na moeda local indicada, sempre rotulada como estimativa.
 5. Ordena os 5 nichos do melhor para o pior (considerando conversão + ticket).
 
-Sé honesto: se a descrição do negócio for vaga ou genérica, di-lo e sugere ao utilizador que refine o perfil (passo 1 do painel) em vez de inventar nichos plausíveis sem fundamento real. Nunca inventes números de ticket como se fossem dados de mercado confirmados — são sempre estimativas informadas.
+Sê honesto: se a descrição do negócio for vaga ou genérica, di-lo e sugere ao utilizador que refine o perfil (passo 1 do painel) em vez de inventar nichos plausíveis sem fundamento real. Nunca inventes números de ticket como se fossem dados de mercado confirmados — são sempre estimativas informadas.
 
 Responde APENAS com JSON válido, sem markdown, com esta forma exata:
 {
@@ -509,13 +509,14 @@ async function runCrmSend(body) {
   const resultados = {};
 
   if (targets.crmWebhookUrl) {
+    const headers = targets.crmSecretToken ? { 'x-webhook-token': targets.crmSecretToken } : {};
     resultados.crm = await dispatchWebhook(targets.crmWebhookUrl, {
       evento: 'lead.enviado',
       timestamp: new Date().toISOString(),
       lead,
       businessProfile,
       analise: analise || null,
-    });
+    }, headers);
   }
 
   if (targets.whatsappWebhookUrl) {
