@@ -420,7 +420,7 @@ A tua missão:
 4. Para cada nicho, dá: uma justificação curta (1 frase), o termo de pesquisa exato a usar no scraping, e uma estimativa de ticket médio mensal/pontual que esse nicho normalmente paga por este tipo de serviço — SEMPRE na moeda local indicada, sempre rotulada como estimativa.
 5. Ordena os 5 nichos do melhor para o pior (considerando conversão + ticket).
 
-Sê honesto: se a descrição do negócio for vaga ou genérica, di-lo e sugere ao utilizador que refine o perfil (passo 1 do painel) em vez de inventar nichos plausíveis sem fundamento real. Nunca inventes números de ticket como se fossem dados de mercado confirmados — são sempre estimativas informadas.
+Sé honesto: se a descrição do negócio for vaga ou genérica, di-lo e sugere ao utilizador que refine o perfil (passo 1 do painel) em vez de inventar nichos plausíveis sem fundamento real. Nunca inventes números de ticket como se fossem dados de mercado confirmados — são sempre estimativas informadas.
 
 Responde APENAS com JSON válido, sem markdown, com esta forma exata:
 {
@@ -580,7 +580,10 @@ export default async function handler(req, res) {
     const { type } = req.body || {};
     const run = HANDLERS[type];
     if (!run) return res.status(400).json({ error: `type inválido. Usa um de: ${Object.keys(HANDLERS).join(', ')}` });
-    if (type !== 'crmSend') requireEnv(['ANTHROPIC_API_KEY']); // crmSend só dispara webhooks, não chama IA
+    // "enrich" precisa sempre da Claude (pesquisa web). Os restantes tentam a Groq primeiro
+    // e só usam a Claude como rede de segurança — por isso não exigimos ANTHROPIC_API_KEY aqui;
+    // callAI() dá um erro claro em runtime se não houver Groq nem Claude configurados.
+    if (type === 'enrich') requireEnv(['ANTHROPIC_API_KEY']);
 
     const result = await run(req.body);
     res.status(200).json(result);
