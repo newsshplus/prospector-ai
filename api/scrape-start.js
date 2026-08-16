@@ -1,36 +1,11 @@
-import { cors, requireEnv, requireAuth, scrapeDuckDuckGo, scrapeGoogleCSE } from './_lib.js';
+import { cors, requireEnv, requireAuth, geocodeZone, scrapeRapidApiLocalBusiness, scrapeDuckDuckGo, scrapeGoogleCSE } from './_lib.js';
 
 const ACTOR_ID = 'nwua9Gu5YrADL7ZDj'; // compass/crawler-google-places
 
-async function geocodeZone(zone) {
-  try {
-    const url = new URL('https://nominatim.openstreetmap.org/search');
-    url.searchParams.set('q', zone);
-    url.searchParams.set('format', 'json');
-    url.searchParams.set('limit', '1');
-    url.searchParams.set('addressdetails', '1');
-    const r = await fetch(url, { headers: { 'User-Agent': 'prospector-ai/1.0' } });
-    if (!r.ok) return {};
-    const results = await r.json();
-    if (results[0]) {
-      return {
-        lat: parseFloat(results[0].lat),
-        lng: parseFloat(results[0].lon),
-        countryCode: (results[0].address?.country_code || '').toUpperCase(),
-      };
-    }
-  } catch {
-    // segue sem coordenadas
-  }
-  return {};
-}
-
-// PRIMARY: Apify (Google Maps). Lança erro se a chave faltar ou o pedido falhar,
-// para o handler principal poder cair para os fallbacks.
-async function tryApify(niche, zone, maxResults) {
+// SECUNDÁRIO: Apify (Google Maps, assíncrono). Lança erro se a chave faltar ou o pedido falhar,
+// para o handler principal poder cair para os fallbacks seguintes.
+async function tryApify(niche, zone, maxResults, geo) {
   requireEnv(['APIFY_KEY']);
-  const { lat, lng, countryCode } = await geocodeZone(zone);
-
   const payload = {
     searchStringsArray: [`${niche} em ${zone}`],
     maxCrawledPlaces: maxResults,
@@ -41,9 +16,9 @@ async function tryApify(niche, zone, maxResults) {
     includeOpeningHours: false,
     includeWebResults: false,
   };
-  if (lat) {
-    payload.lat = lat;
-    payload.lng = lng;
+  if (geo.lat) {
+    payload.lat = geo.lat;
+    payload.lng = geo.lng;
     payload.zoom = 12;
   }
 
@@ -55,7 +30,7 @@ async function tryApify(niche, zone, maxResults) {
   if (!r.ok) throw new Error(`Apify falhou: ${r.status} ${await r.text()}`);
   const data = await r.json();
 
-  return { runId: data.data.id, countryCode: countryCode || null };
+  return { runId: data.data.id };
 }
 
 // POST { niche, zone, maxResults }
@@ -69,19 +44,36 @@ export default async function handler(req, res) {
     const { niche, zone, maxResults = 60 } = req.body || {};
     if (!niche || !zone) return res.status(400).json({ error: 'niche e zone são obrigatórios' });
 
-    // PRIMARY: Apify
+    // Geocodifica sempre primeiro — dá-nos o país (para a moeda local e para o idioma/região
+    // corretos no RapidAPI) independentemente de qual fonte de scraping acabar a ser usada.
+    const geo = await geocodeZone(zone);
+    const countryCode = geo.countryCode || null;
+
+    // PRIMÁRIA: RapidAPI "Local Business Data" — síncrona (sem polling), e devolve email/redes
+    // sociais quando disponíveis, o que dá à Groq mais contexto real para o ICP scoring.
     try {
-      const { runId, countryCode } = await tryApify(niche, zone, maxResults);
+      const leads = await scrapeRapidApiLocalBusiness(niche, zone, maxResults, countryCode);
+      if (leads.length) {
+        return res.status(200).json({ mode: 'sync', leads, source: 'rapidapi', countryCode });
+      }
+      console.error('RapidAPI (Local Business Data) devolveu 0 resultados, a tentar Apify.');
+    } catch (rapidErr) {
+      console.error('RapidAPI indisponível, a tentar Apify:', rapidErr.message);
+    }
+
+    // SECUNDÁRIA: Apify (assíncrono)
+    try {
+      const { runId } = await tryApify(niche, zone, maxResults, geo);
       return res.status(200).json({ mode: 'async', runId, countryCode });
     } catch (apifyErr) {
       console.error('Apify indisponível, a tentar fallback:', apifyErr.message);
     }
 
-    // SECONDARY: DuckDuckGo HTML (grátis, sem chave necessária)
+    // TERCIÁRIA: DuckDuckGo HTML (grátis, sem chave necessária)
     let leads = await scrapeDuckDuckGo(niche, zone, maxResults);
     let source = 'duckduckgo';
 
-    // TERTIARY: Google Custom Search — só funciona com uma chave já existente
+    // QUATERNÁRIA: Google Custom Search — só funciona com uma chave já existente
     // (a API está fechada a novos registos desde 2025)
     if (!leads.length) {
       leads = await scrapeGoogleCSE(niche, zone, maxResults);
@@ -90,11 +82,11 @@ export default async function handler(req, res) {
 
     if (!leads.length) {
       return res.status(502).json({
-        error: 'O Apify está indisponível e as fontes de fallback (DuckDuckGo/Google) não devolveram resultados. Verifica a APIFY_KEY ou tenta um nicho/zona diferente.',
+        error: 'Nenhuma fonte de scraping (RapidAPI, Apify, DuckDuckGo, Google) devolveu resultados. Verifica as chaves configuradas ou tenta um nicho/zona diferente.',
       });
     }
 
-    res.status(200).json({ mode: 'sync', leads, source });
+    res.status(200).json({ mode: 'sync', leads, source, countryCode });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }

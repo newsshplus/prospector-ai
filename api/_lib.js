@@ -423,6 +423,63 @@ export async function scrapeGoogleCSE(niche, zone, maxResults) {
     }));
 }
 
+// --- RapidAPI "Local Business Data" — fonte PRIMÁRIA de leads. Síncrona (sem polling, ao contrário
+// do Apify) e devolve dados mais ricos (email, redes sociais quando disponíveis) para a Groq analisar
+// melhor no ICP scoring. Precisa de RAPIDAPI_KEY nas variáveis de ambiente. ---
+
+const RAPIDAPI_LANG_BY_COUNTRY = {
+  PT: 'pt', BR: 'pt', ES: 'es', FR: 'fr', DE: 'de', IT: 'it', GB: 'en', US: 'en',
+};
+
+export async function scrapeRapidApiLocalBusiness(niche, zone, maxResults, countryCode) {
+  const key = process.env.RAPIDAPI_KEY;
+  if (!key) return [];
+
+  const lang = RAPIDAPI_LANG_BY_COUNTRY[(countryCode || '').toUpperCase()] || 'en';
+  const region = (countryCode || 'us').toLowerCase();
+
+  const url = new URL('https://local-business-data.p.rapidapi.com/search');
+  url.searchParams.set('query', `${niche} ${zone}`);
+  url.searchParams.set('limit', String(Math.min(maxResults || 20, 20)));
+  url.searchParams.set('language', lang);
+  url.searchParams.set('region', region);
+  url.searchParams.set('extract_emails_and_contacts', 'true');
+
+  const r = await fetch(url, {
+    headers: {
+      'X-RapidAPI-Key': key,
+      'X-RapidAPI-Host': 'local-business-data.p.rapidapi.com',
+    },
+  });
+  if (!r.ok) throw new Error(`RapidAPI (Local Business Data) falhou: ${r.status} ${await r.text()}`);
+  const data = await r.json();
+  const items = data?.data || [];
+
+  return items
+    .map((it) => {
+      const contacts = it.emails_and_contacts || {};
+      return {
+        empresa: it.name || '',
+        website: it.website || '',
+        telefone: (it.phone_number || '').replace(/[^\d+]/g, ''),
+        categoria: it.category || (Array.isArray(it.categories) ? it.categories[0] : '') || '',
+        endereco: it.full_address || it.address || '',
+        cidade: it.city || zone,
+        googleMaps: it.place_link || it.google_maps_url || it.link || '',
+        rating: it.rating ?? null,
+        reviews: it.review_count ?? it.reviews_count ?? null,
+        // Extras — não usados pelo Airtable schema base, mas passam para o prompt da Groq
+        // no ICP scoring, dando mais contexto real para a análise (nunca inventado).
+        email: (contacts.emails || [])[0] || it.email || null,
+        instagram: (contacts.instagram || [])[0] || null,
+        linkedin: (contacts.linkedin || [])[0] || null,
+        horarioFuncionamento: it.working_hours ? JSON.stringify(it.working_hours) : null,
+        verificado: it.verified ?? null,
+      };
+    })
+    .filter((l) => l.empresa);
+}
+
 // --- Pontuação ICP (Claude) + gravação em lote no Airtable — partilhado por todos os modos de scraping ---
 
 const ICP_SYSTEM = `És um analista sénior de qualificação de leads B2B (ICP Match Engine).
@@ -470,6 +527,7 @@ export async function scoreAndSaveLeads(baseId, tableId, businessProfile, leads,
     Empresa: s.empresa,
     Website: s.website || undefined,
     Telefone: s.telefone || undefined,
+    Email: s.email || undefined,
     'ICP Score': s.score,
     Classificação: s.classificacao,
     'Dor Identificada': s.dor,

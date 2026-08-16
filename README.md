@@ -16,6 +16,10 @@ Para tarefas de texto puro (ICP score, WhatsApp, email, objeções, cadência, d
 
 A única tarefa que usa sempre a Claude diretamente é o **Enriquecimento BANT+** (botão "Enriquecer"), porque precisa da ferramenta de pesquisa web da Claude para investigar o decisor-chave e sinais de urgência — a Groq não tem essa ferramenta embutida.
 
+## Fonte principal de leads: RapidAPI (Local Business Data)
+
+A busca de leads usa por defeito a API **Local Business Data** (via RapidAPI) como fonte principal — é síncrona (sem esperar por um job assíncrono como o Apify) e devolve dados mais ricos quando disponíveis (email, Instagram, horário), que alimentam diretamente o ICP scoring da Groq com mais contexto real para analisar. A cadeia de fallback completa é: **RapidAPI → Apify → DuckDuckGo → Google CSE**, cada um só é tentado se o anterior falhar ou não devolver resultados.
+
 ## Descoberta de nicho sem obrigatoriedade — e por ticket médio
 
 Não precisas de indicar um nicho manualmente. No passo 3, escreves só a localização-alvo e clicas "Descobrir nichos automaticamente": a IA lê **todos** os serviços descritos no teu perfil (não só o primeiro que aparece no texto), identifica as 3 maiores dores que resolves, e sugere 5 nichos ordenados do melhor para o pior — o critério combina probabilidade de conversão **e** ticket médio esperado nesse nicho, sempre expresso na moeda local (ver abaixo). Podes usar o nicho recomendado nº1 diretamente ou escolher outro da lista.
@@ -51,10 +55,11 @@ Os campos de WhatsApp/Email seguem o mesmo padrão de webhook genérico, para os
 | `AIRTABLE_TOKEN` | airtable.com/create/tokens — scopes: `data.records:read`, `data.records:write`, `schema.bases:write`, `schema.bases:read` |
 | `ANTHROPIC_API_KEY` | console.anthropic.com → API Keys |
 
-### Opcionais (mas recomendadas para poupar tokens da Claude e ativar o copiloto de áudio)
+### Opcionais (mas recomendadas para poupar tokens da Claude, ativar o copiloto de áudio, e ter a melhor fonte de leads)
 
 | Variável | Para quê |
 |---|---|
+| `RAPIDAPI_KEY` | rapidapi.com → subscreve à API "Local Business Data" (plano gratuito disponível) → copia a chave. Fonte principal de leads — sem ela, o sistema salta diretamente para o Apify. |
 | `GROQ_API_KEY_1`, `GROQ_API_KEY_2`, `GROQ_API_KEY_3` | Até 3 chaves da Groq (console.groq.com → API Keys). Com pelo menos uma preenchida, o sistema tenta a Groq primeiro em quase todas as tarefas de texto, e ativa a transcrição de áudio do copiloto (Whisper). Sem nenhuma, usa sempre a Claude e o copiloto de áudio fica desativado (só texto). |
 | `SESSION_SECRET` | Segredo para assinar o cookie de sessão. Se não definires, o sistema usa o `APP_PASSWORD` como segredo (funciona, mas é mais seguro teres um segredo à parte). |
 | `GOOGLE_CSE_KEY` + `GOOGLE_CSE_CX` | Fallback terciário de scraping — só funciona com uma chave já existente de antes de 2025 (ver limitações abaixo). |
@@ -78,8 +83,9 @@ O perfil do negócio, o Base/Table ID e os URLs de webhook ficam guardados no `l
 - **Login é de password única partilhada** — não há gestão de utilizadores nem convites.
 - **Copiloto não é streaming de áudio contínuo** — funciona por clipes curtos carregados/transcritos, não por escuta ao vivo de uma chamada em curso (essa infraestrutura de telefonia não existe nesta stack).
 - **Webhook de CRM aponta para o CriaHub Ads real** — não é genérico/adivinhado: usa o recetor de webhooks de entrada já existente no `newsshplus/criahubads` (`hub-webhook`). A transformação desses dados em leads reais na base do CriaHub Ads depende de automação própria desse projeto (fora do âmbito do Prospector AI).
-- **Cadeia de fallback de scraping** (primário Apify → secundário DuckDuckGo → terciário Google Custom Search):
-  - O **DuckDuckGo é grátis e não precisa de chave**, mas devolve menos campos que o Apify.
+- **Cadeia de fallback de scraping** (RapidAPI → Apify → DuckDuckGo → Google Custom Search):
+  - **RapidAPI** precisa de `RAPIDAPI_KEY` — sem ela, salta direto para o Apify.
+  - O **DuckDuckGo é grátis e não precisa de chave**, mas devolve menos campos que o RapidAPI/Apify.
   - A **Bing Search API foi totalmente descontinuada pela Microsoft em 11 de agosto de 2025** — não está implementada.
   - A **Google Custom Search JSON API está fechada a novos registos desde 2025** — só funciona com uma chave já existente de antes disso.
 - Filtragem por país é opcional e best-effort (via geocoding), e só se aplica ao caminho do Apify.
@@ -96,12 +102,12 @@ api/ai.js                → endpoint único para enrich/outreach/objections/cad
                             de 12 funções do plano Hobby)
 api/transcribe.js        → transcreve um clipe de áudio curto (Whisper via Groq) para o copiloto
 api/airtable-init.js     → cria a base Airtable com o schema completo
-api/scrape-start.js      → inicia o scraping (Apify → fallback DuckDuckGo → fallback Google CSE)
+api/scrape-start.js      → inicia o scraping (RapidAPI → Apify → DuckDuckGo → Google CSE)
 api/scrape-status.js     → consulta o estado do scraping (modo Apify)
 api/scrape-finish.js     → pontua leads com IA e grava no Airtable, com moeda local (modo Apify ou fallback)
 api/leads.js             → lista os leads da base para o dashboard
 api/report.js            → relatório executivo com métricas reais do pipeline
-api/_lib.js              → helpers partilhados (Airtable, Claude API, Groq API, moeda/país,
+api/_lib.js              → helpers partilhados (Airtable, Claude API, Groq API, RapidAPI, moeda/país,
                             webhooks de saída, sessão/auth)
 ```
 
