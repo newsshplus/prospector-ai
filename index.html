@@ -186,7 +186,11 @@
 
       <div class="card">
         <h2><span class="num">3</span> Nova prospecção</h2>
-        <label>Nicho</label>
+        <label>Localização-alvo (para descoberta automática de nicho)</label>
+        <input id="sc-loc" placeholder="Ex: Cascais, Portugal" />
+        <div class="row-actions"><button class="btn-ghost btn-small" onclick="discoverNiches()">🔍 Descobrir nichos automaticamente</button></div>
+        <div id="niches-wrap"></div>
+        <label style="margin-top:14px;">Nicho</label>
         <input id="sc-niche" placeholder="Ex: casas modulares" />
         <label>Zona</label>
         <input id="sc-zone" placeholder="Ex: Cascais, Portugal" />
@@ -280,6 +284,46 @@ function setStatus(id, msg, cls){
   const el = document.getElementById(id);
   el.textContent = msg;
   el.className = 'status-line' + (cls ? ' ' + cls : '');
+}
+
+async function discoverNiches(){
+  const localizacao = document.getElementById('sc-loc').value.trim();
+  const wrap = document.getElementById('niches-wrap');
+  if(!localizacao) return alert('Preenche a localização-alvo primeiro.');
+  const profile = getProfile();
+
+  wrap.innerHTML = '<div class="status-line">A analisar o perfil e a descobrir nichos…</div>';
+  try{
+    const r = await fetch('/api/discover-niches', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ businessProfile: profile, localizacao })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+
+    let html = '';
+    if(data.aviso){
+      html += '<div class="status-line err">' + esc(data.aviso) + '</div>';
+    }
+    if(data.dores && data.dores.length){
+      html += '<div class="status-line" style="margin-top:8px;"><strong>Dores identificadas:</strong> ' + esc(data.dores.join(' · ')) + '</div>';
+    }
+    (data.nichos || []).forEach((n) => {
+      html += '<div style="border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:8px;">' +
+        '<div style="font-weight:600; color:var(--navy-deep); font-size:13px;">' + esc(n.nicho) + '</div>' +
+        '<div class="dor" style="margin:2px 0 6px;">' + esc(n.justificacao) + '</div>' +
+        '<button class="btn-ghost btn-small" onclick="useNiche(' + "'" + n.queryPesquisa.replace(/'/g,"\\'") + "'" + ',' + "'" + localizacao.replace(/'/g,"\\'") + "'" + ')">Usar este nicho</button>' +
+      '</div>';
+    });
+    wrap.innerHTML = html;
+  }catch(e){
+    wrap.innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function useNiche(query, localizacao){
+  document.getElementById('sc-niche').value = query;
+  document.getElementById('sc-zone').value = localizacao;
 }
 
 async function initBase(){
