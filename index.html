@@ -578,15 +578,18 @@ async function runScrape(){
     if(!startR.ok) throw new Error(start.error);
 
     if(start.mode === 'sync'){
-      const sourceLabel = start.source === 'duckduckgo' ? 'DuckDuckGo' : 'Google Custom Search';
-      setStatus('sc-status', 'Apify indisponível — a usar fallback (' + sourceLabel + '), ' + start.leads.length + ' resultados. A pontuar com IA…');
+      const sourceLabels = { rapidapi: 'RapidAPI (Local Business Data)', duckduckgo: 'DuckDuckGo', google_cse: 'Google Custom Search' };
+      const sourceLabel = sourceLabels[start.source] || start.source;
+      const statusPrefix = start.source === 'rapidapi' ? '' : 'Apify indisponível — a usar fallback ';
+      setStatus('sc-status', statusPrefix + '(' + sourceLabel + '), ' + start.leads.length + ' resultados. A pontuar com IA…');
       const finishR = await fetch('/api/scrape-finish', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ leads: start.leads, baseId, tableId, businessProfile: profile })
       });
       const finish = await finishR.json();
       if(!finishR.ok) throw new Error(finish.error);
-      setStatus('sc-status', finish.saved + ' leads gravados via fallback (' + sourceLabel + '). Nota: menos completos que o Apify (sem telefone/rating).', 'ok');
+      const noteSuffix = start.source === 'rapidapi' ? '' : ' Nota: menos completos que o Apify (sem telefone/rating).';
+      setStatus('sc-status', finish.saved + ' leads gravados via ' + sourceLabel + '.' + noteSuffix, 'ok');
       loadLeads();
       return;
     }
