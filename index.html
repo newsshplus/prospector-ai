@@ -426,7 +426,8 @@ function renderLeads(){
       '<td style="white-space:nowrap;">' +
         '<button class="btn-ghost btn-small" onclick="openEnrich(' + i + ')">Enriquecer</button> ' +
         '<button class="btn-ghost btn-small" onclick="openOutreach(' + i + ')">Abordagens</button> ' +
-        '<button class="btn-ghost btn-small" onclick="openDeliverability(' + i + ')">Qualidade</button>' +
+        '<button class="btn-ghost btn-small" onclick="openDeliverability(' + i + ')">Qualidade</button> ' +
+        '<button class="btn-ghost btn-small" onclick="openObjections(' + i + ')">Objeções</button>' +
       '</td>' +
       '</tr>';
   });
@@ -529,6 +530,43 @@ function renderDeliverability(data){
     '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(data.emailPlainText) + '">copiar</button></div>' +
     '<pre>' + esc(data.emailPlainText) + '</pre></div>';
 
+  body.innerHTML = html;
+}
+
+async function openObjections(i){
+  const lead = currentLeads[i];
+  const { baseId, tableId } = getAirtable();
+  const idioma = document.getElementById('sc-lang').value;
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = 'Roteiro anti-objeção para chamada ao vivo';
+  document.getElementById('m-body').innerHTML = 'A preparar os roteiros de objeção…';
+  document.getElementById('modal-bg').classList.add('show');
+
+  try{
+    const r = await fetch('/api/objections', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderObjections(data);
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderObjections(data){
+  const body = document.getElementById('m-body');
+  let html = '';
+  (data.objecoes || []).forEach((o, idx) => {
+    html += '<div class="block"><div class="label"><span>Objeção ' + (idx+1) + ': ' + esc(o.objecao) + '</span>' +
+      '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(o.resposta) + '">copiar</button></div>' +
+      '<pre>' + esc(o.resposta) + '</pre></div>';
+  });
+  if(data.fechamento && data.fechamento.length){
+    html += '<div class="block"><div class="label">Frases de fecho (para agendar reunião)</div><pre>' +
+      esc(data.fechamento.map((f,i)=> (i+1)+'. '+f).join('\n')) + '</pre></div>';
+  }
   body.innerHTML = html;
 }
 
