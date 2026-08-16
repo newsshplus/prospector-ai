@@ -480,6 +480,69 @@ export async function scrapeRapidApiLocalBusiness(niche, zone, maxResults, count
     .filter((l) => l.empresa);
 }
 
+// --- Schema completo da base Airtable — partilhado entre a criação da base (airtable-init.js) e a
+// gravação de leads (scoreAndSaveLeads), para nunca tentarmos escrever num campo que não existe. ---
+
+export const BASE_FIELDS = [
+  { name: 'Empresa', type: 'singleLineText' },
+  { name: 'Website', type: 'url' },
+  { name: 'Decisor', type: 'singleLineText' },
+  { name: 'Telefone', type: 'phoneNumber' },
+  { name: 'Email', type: 'email' },
+  { name: 'ICP Score', type: 'number', options: { precision: 0 } },
+  {
+    name: 'Classificação',
+    type: 'singleSelect',
+    options: {
+      choices: [
+        { name: 'Score A - Hot', color: 'greenBright' },
+        { name: 'Score B - Warm', color: 'yellowBright' },
+        { name: 'Score C - Cold', color: 'grayBright' },
+      ],
+    },
+  },
+  { name: 'Dor Identificada', type: 'multilineText' },
+  { name: 'Próxima Ação', type: 'singleLineText' },
+  { name: 'Moeda', type: 'singleLineText' },
+  { name: 'Cargo', type: 'singleLineText' },
+  { name: 'Techs Utilizadas', type: 'multilineText' },
+  { name: 'Fator de Urgência', type: 'multilineText' },
+  { name: 'Budget Estimado', type: 'singleLineText' },
+  { name: 'Intent Score', type: 'number', options: { precision: 0 } },
+  {
+    name: 'Prioridade de Disparo',
+    type: 'singleSelect',
+    options: {
+      choices: [
+        { name: 'Alta - Disparo imediato', color: 'redBright' },
+        { name: 'Média - Fila padrão', color: 'yellowBright' },
+        { name: 'Desqualificado', color: 'grayBright' },
+      ],
+    },
+  },
+  { name: 'WhatsApp Msg 1', type: 'multilineText' },
+  { name: 'WhatsApp Msg 2', type: 'multilineText' },
+  { name: 'Email Assunto', type: 'singleLineText' },
+  { name: 'Email Corpo', type: 'multilineText' },
+  { name: 'Script Ligação', type: 'multilineText' },
+  { name: 'Google Maps', type: 'url' },
+  { name: 'Rating', type: 'number', options: { precision: 1 } },
+  { name: 'Reviews', type: 'number', options: { precision: 0 } },
+  {
+    name: 'Status',
+    type: 'singleSelect',
+    options: {
+      choices: [
+        { name: 'Novo', color: 'blueBright' },
+        { name: 'Contatado', color: 'cyanBright' },
+        { name: 'Respondeu', color: 'tealBright' },
+        { name: 'Reunião Agendada', color: 'purpleBright' },
+        { name: 'Descartado', color: 'redBright' },
+      ],
+    },
+  },
+];
+
 // --- Pontuação ICP (Claude) + gravação em lote no Airtable — partilhado por todos os modos de scraping ---
 
 const ICP_SYSTEM = `És um analista sénior de qualificação de leads B2B (ICP Match Engine).
@@ -505,6 +568,10 @@ Responde só com o array JSON.`;
 export async function scoreAndSaveLeads(baseId, tableId, businessProfile, leads, countryCode) {
   if (!leads.length) return { saved: 0, total: 0 };
 
+  // Garante que TODOS os campos que vamos escrever existem na base — a base pode ter sido
+  // criada antes de algum campo ter sido adicionado ao schema, ou criada manualmente.
+  await airtableEnsureFields(baseId, tableId, BASE_FIELDS);
+
   const currency = currencyForCountry(countryCode);
   const currencyCtx = countryCode ? currencyLabel(countryCode) : null;
 
@@ -517,10 +584,6 @@ export async function scoreAndSaveLeads(baseId, tableId, businessProfile, leads,
       const lead = chunk[r.index];
       if (lead) scored.push({ ...lead, ...r });
     }
-  }
-
-  if (countryCode) {
-    await airtableEnsureFields(baseId, tableId, [{ name: 'Moeda', type: 'singleLineText' }]);
   }
 
   const records = scored.map((s) => ({
