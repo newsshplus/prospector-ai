@@ -8,6 +8,87 @@ export function cors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+// --- Moeda local por país — usado para expressar ticket médio/orçamento na moeda certa ---
+
+export const CURRENCY_BY_COUNTRY = {
+  PT: { code: 'EUR', symbol: '€' }, ES: { code: 'EUR', symbol: '€' }, FR: { code: 'EUR', symbol: '€' },
+  DE: { code: 'EUR', symbol: '€' }, IT: { code: 'EUR', symbol: '€' }, NL: { code: 'EUR', symbol: '€' },
+  IE: { code: 'EUR', symbol: '€' }, BE: { code: 'EUR', symbol: '€' }, AT: { code: 'EUR', symbol: '€' },
+  BR: { code: 'BRL', symbol: 'R$' },
+  CH: { code: 'CHF', symbol: 'Fr.' },
+  GB: { code: 'GBP', symbol: '£' },
+  US: { code: 'USD', symbol: '$' },
+  MX: { code: 'MXN', symbol: '$' }, AR: { code: 'ARS', symbol: '$' }, CO: { code: 'COP', symbol: '$' },
+  CL: { code: 'CLP', symbol: '$' }, PE: { code: 'PEN', symbol: 'S/' }, UY: { code: 'UYU', symbol: '$' },
+  AO: { code: 'AOA', symbol: 'Kz' }, MZ: { code: 'MZN', symbol: 'MT' }, CV: { code: 'CVE', symbol: '$' },
+};
+
+export function currencyForCountry(countryCode) {
+  return CURRENCY_BY_COUNTRY[(countryCode || '').toUpperCase()] || { code: 'EUR', symbol: '€' };
+}
+
+export function currencyLabel(countryCode) {
+  const c = currencyForCountry(countryCode);
+  return `${c.code} (${c.symbol})`;
+}
+
+// --- Geocodificação partilhada (usada no scraping e na descoberta de nicho, para saber o país/moeda) ---
+
+export async function geocodeZone(zone) {
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/search');
+    url.searchParams.set('q', zone);
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('limit', '1');
+    url.searchParams.set('addressdetails', '1');
+    const r = await fetch(url, { headers: { 'User-Agent': 'prospector-ai/1.0' } });
+    if (!r.ok) return {};
+    const results = await r.json();
+    if (results[0]) {
+      return {
+        lat: parseFloat(results[0].lat),
+        lng: parseFloat(results[0].lon),
+        countryCode: (results[0].address?.country_code || '').toUpperCase(),
+      };
+    }
+  } catch {
+    // segue sem coordenadas
+  }
+  return {};
+}
+
+// --- Dispatch de webhooks de saída (CRM / WhatsApp via Evolution API ou Evolution Go / Email) ---
+// Payload genérico e bem estruturado — sem documentação oficial da API do teu CRM, isto é o formato
+// mais seguro para ligares através de uma automação (n8n/Make) que já usas noutros sítios.
+
+export async function dispatchWebhook(url, body) {
+  if (!url) return { skipped: true };
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await r.text().catch(() => '');
+    return { ok: r.ok, status: r.status, response: text.slice(0, 500) };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+export function buildWhatsAppPayload(provider, phone, message) {
+  // Evolution API (e Evolution Go, fork compatível) — endpoint típico: POST {host}/message/sendText/{instance}
+  if (provider === 'evolution' || provider === 'evolution-go') {
+    return { number: phone, text: message, delay: 1200 };
+  }
+  // Z-API — formato alternativo comum
+  if (provider === 'zapi') {
+    return { phone, message };
+  }
+  // genérico
+  return { phone, message };
+}
+
 export function airtableHeaders() {
   return {
     Authorization: `Bearer ${process.env.AIRTABLE_TOKEN}`,
@@ -347,11 +428,11 @@ Formato de cada item: {"index": number, "score": number (0-100), "classificacao"
 Critérios: Score A (85-100) = gaps claros que o serviço resolve imediatamente, boa maturidade digital/orçamental. Score B (60-84) = perfil ideal mas sem dor urgente explícita. Score C (<60) = fora do segmento ou sem potencial — ainda assim inclui no array.
 Escreve "dor" e "proximaAcao" em português europeu (PT-PT), sem brasileirismos.`;
 
-async function scoreBatchWithAI(businessProfile, leads) {
+async function scoreBatchWithAI(businessProfile, leads, currencyCtx) {
   const prompt = `PERFIL DO MEU NEGÓCIO:
 ${JSON.stringify(businessProfile, null, 2)}
 
-EMPRESAS ENCONTRADAS (array, usa o "index" de cada uma na tua resposta):
+${currencyCtx ? `MOEDA LOCAL DESTE MERCADO: ${currencyCtx} — se comentares ticket/orçamento, usa esta moeda.\n\n` : ''}EMPRESAS ENCONTRADAS (array, usa o "index" de cada uma na tua resposta):
 ${JSON.stringify(leads.map((l, i) => ({ index: i, ...l })), null, 2)}
 
 Responde só com o array JSON.`;
@@ -359,18 +440,25 @@ Responde só com o array JSON.`;
   return parseJsonLoose(text);
 }
 
-export async function scoreAndSaveLeads(baseId, tableId, businessProfile, leads) {
+export async function scoreAndSaveLeads(baseId, tableId, businessProfile, leads, countryCode) {
   if (!leads.length) return { saved: 0, total: 0 };
+
+  const currency = currencyForCountry(countryCode);
+  const currencyCtx = countryCode ? currencyLabel(countryCode) : null;
 
   const scored = [];
   const BATCH = 15;
   for (let i = 0; i < leads.length; i += BATCH) {
     const chunk = leads.slice(i, i + BATCH);
-    const results = await scoreBatchWithAI(businessProfile, chunk);
+    const results = await scoreBatchWithAI(businessProfile, chunk, currencyCtx);
     for (const r of results) {
       const lead = chunk[r.index];
       if (lead) scored.push({ ...lead, ...r });
     }
+  }
+
+  if (countryCode) {
+    await airtableEnsureFields(baseId, tableId, [{ name: 'Moeda', type: 'singleLineText' }]);
   }
 
   const records = scored.map((s) => ({
@@ -385,6 +473,7 @@ export async function scoreAndSaveLeads(baseId, tableId, businessProfile, leads)
     Rating: s.rating ?? undefined,
     Reviews: s.reviews ?? undefined,
     Status: 'Novo',
+    Moeda: countryCode ? `${currency.code} (${currency.symbol})` : undefined,
   }));
 
   const created = await airtableCreateRecords(baseId, tableId, records);

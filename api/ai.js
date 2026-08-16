@@ -9,6 +9,11 @@ import {
   checkEmailDeliverability,
   airtableEnsureFields,
   airtableUpdateRecord,
+  geocodeZone,
+  currencyForCountry,
+  currencyLabel,
+  dispatchWebhook,
+  buildWhatsAppPayload,
 } from './_lib.js';
 
 const DEFAULT_IDIOMA = 'Português de Portugal (PT-PT)';
@@ -43,7 +48,7 @@ Depois de pesquisares, responde APENAS com um objeto JSON válido (sem markdown,
 {
   "cargo": string (cargo do decisor-chave encontrado, ou "Não identificado"),
   "decisorChave": string (nome do decisor-chave, ou "Não identificado"),
-  "budget": string (estimativa de orçamento em faixa, ex: "500-1500€/mês", sempre rotulado como estimativa, nunca como facto confirmado),
+  "budget": string (estimativa de orçamento em faixa, NA MOEDA LOCAL INDICADA, sempre rotulado como estimativa, nunca como facto confirmado),
   "authority": string (1 frase sobre a estrutura de decisão encontrada),
   "need": [string, string, string] (exatamente 3 falhas operacionais/estéticas/tecnológicas reais e específicas encontradas),
   "timeline": string (1 frase resumindo o indicador de urgência mais forte encontrado, ou "Sem sinais de urgência identificados"),
@@ -59,12 +64,15 @@ async function runEnrich(body) {
 
   const website = lead.Website || lead.website;
   const { detected: techDetected } = await detectTechStack(website);
+  const moeda = lead.Moeda || 'EUR (€)';
 
   const prompt = `PERFIL DO MEU NEGÓCIO:
 ${JSON.stringify(businessProfile, null, 2)}
 
 LEAD (dados brutos da raspagem):
 ${JSON.stringify(lead, null, 2)}
+
+MOEDA LOCAL DESTE LEAD: ${moeda} — usa esta moeda na estimativa de orçamento.
 
 TECH STACK JÁ DETETADA TECNICAMENTE NO SITE (via análise do HTML, confiança alta):
 ${techDetected.length ? techDetected.join(', ') : 'Nenhuma detetada automaticamente — investiga via pesquisa web.'}
@@ -399,23 +407,27 @@ Responde só com o objeto JSON.`;
 
 // ==================================================================
 // type: "discoverNiches" — Descoberta autónoma de nicho (texto puro → Groq primeiro)
+// Considera TODOS os serviços descritos no perfil (não só um ângulo) e sugere
+// ticket médio estimado na moeda local do mercado-alvo.
 // ==================================================================
 const DISCOVER_SYSTEM = `És um estratega sénior de go-to-market B2B.
-Recebes apenas o perfil de um negócio (site, descrição, ICP) e uma localização-alvo — sem nicho definido.
+Recebes o perfil de um negócio (site, descrição — que pode cobrir VÁRIOS serviços/linhas de trabalho diferentes) e uma localização-alvo — sem nicho definido.
 
 A tua missão:
-1. Identifica as 3 maiores dores que este negócio resolve para os seus clientes.
-2. A partir dessas dores, identifica os 5 melhores nichos comerciais para prospectar na localização indicada — nichos com necessidade clara deste tipo de serviço E capacidade financeira razoável para o pagar. Não escolhas nichos genéricos demais ("empresas" não é um nicho); sê específico (ex: "clínicas dentárias", "escritórios de advocacia imobiliária").
-3. Para cada nicho, escreve uma justificação curta (1 frase) de porque é um bom encaixe, e sugere o termo de pesquisa exato a usar no scraping (ex: "clínicas dentárias em Cascais").
+1. Lê a descrição do negócio como um todo — se o negócio oferece vários serviços diferentes, considera-os TODOS ao procurares nichos, não te fixes só no primeiro serviço mencionado.
+2. Identifica as 3 maiores dores que este negócio resolve (no conjunto dos seus serviços).
+3. Identifica os 5 melhores nichos comerciais para prospectar na localização indicada — combina dois critérios: (a) alta probabilidade de conversão (dor clara + urgência plausível) e (b) ticket médio bom para o teu negócio. Não escolhas nichos genéricos demais ("empresas" não é um nicho); sê específico.
+4. Para cada nicho, dá: uma justificação curta (1 frase), o termo de pesquisa exato a usar no scraping, e uma estimativa de ticket médio mensal/pontual que esse nicho normalmente paga por este tipo de serviço — SEMPRE na moeda local indicada, sempre rotulada como estimativa.
+5. Ordena os 5 nichos do melhor para o pior (considerando conversão + ticket).
 
-Sê honesto: se a descrição do negócio for vaga ou genérica, di-lo e sugere ao utilizador que refine o perfil (passo 1 do painel) em vez de inventar nichos plausíveis sem fundamento real.
+Sê honesto: se a descrição do negócio for vaga ou genérica, di-lo e sugere ao utilizador que refine o perfil (passo 1 do painel) em vez de inventar nichos plausíveis sem fundamento real. Nunca inventes números de ticket como se fossem dados de mercado confirmados — são sempre estimativas informadas.
 
 Responde APENAS com JSON válido, sem markdown, com esta forma exata:
 {
   "dores": [string, string, string],
   "nichos": [
-    {"nicho": string, "justificacao": string, "queryPesquisa": string}
-    ... exatamente 5
+    {"nicho": string, "justificacao": string, "queryPesquisa": string, "ticketMedioEstimado": string, "rank": number}
+    ... exatamente 5, rank de 1 (melhor) a 5
   ],
   "aviso": string | null (usa isto só se a descrição do negócio for demasiado vaga para uma análise fiável)
 }
@@ -428,15 +440,113 @@ async function runDiscoverNiches(body) {
     throw badRequest('Preenche uma descrição mais detalhada do negócio no passo 1 antes de descobrir nichos.');
   }
 
-  const prompt = `PERFIL DO NEGÓCIO:
+  const geo = await geocodeZone(localizacao);
+  const moeda = currencyLabel(geo.countryCode);
+
+  const prompt = `PERFIL DO NEGÓCIO (pode ter vários serviços — considera todos):
 ${JSON.stringify(businessProfile, null, 2)}
 
 LOCALIZAÇÃO-ALVO: ${localizacao}
+MOEDA LOCAL DESTE MERCADO: ${moeda}
 
 Responde só com o objeto JSON.`;
 
-  const text = await callAI({ system: DISCOVER_SYSTEM, prompt, maxTokens: 2000 });
+  const text = await callAI({ system: DISCOVER_SYSTEM, prompt, maxTokens: 2500 });
+  const result = parseJsonLoose(text);
+  result.moeda = moeda;
+  result.countryCode = geo.countryCode || null;
+  if (Array.isArray(result.nichos)) {
+    result.nichos.sort((a, b) => (a.rank || 99) - (b.rank || 99));
+  }
+  return result;
+}
+
+// ==================================================================
+// type: "liveAssist" — Copiloto quase-em-tempo-real para chamada/WhatsApp (texto puro → Groq primeiro, latência baixa)
+// Não é escuta contínua de áudio — recebe um trecho de texto (digitado, colado, ou transcrito de um
+// áudio curto) e devolve uma sugestão de resposta imediata para o agente humano usar.
+// ==================================================================
+const LIVE_ASSIST_SYSTEM = `És um copiloto de vendas B2B que assiste um agente humano EM TEMPO REAL durante uma chamada ou conversa de WhatsApp.
+Recebes a última mensagem/frase do lead (pode vir de texto escrito ou de uma transcrição de áudio, por isso pode ter imperfeições de transcrição — interpreta com bom senso), o histórico recente da conversa se existir, e o contexto do lead/negócio.
+
+A tua resposta tem de ser CURTA e IMEDIATAMENTE UTILIZÁVEL — o agente vai lê-la e usá-la em segundos, não é para ler um ensaio.
+
+Responde APENAS com JSON válido, sem markdown, com esta forma exata:
+{
+  "leituraDaSituacao": string (1 frase curta: o que o lead está a sinalizar — interesse, objeção, dúvida, desinteresse, etc.),
+  "respostaSugerida": string (a frase ou 2 frases exatas que o agente pode dizer/escrever agora, no idioma pedido, tom natural),
+  "proximoPasso": string (1 frase: o que fazer a seguir depois desta resposta)
+}
+Nunca sugere afirmações falsas sobre o produto/serviço ou a concorrência. Se a mensagem do lead for ambígua, a leituraDaSituacao deve dizer isso em vez de assumir.`;
+
+async function runLiveAssist(body) {
+  const { mensagemRecebida, historico, lead, businessProfile, idioma = DEFAULT_IDIOMA } = body;
+  if (!mensagemRecebida || !businessProfile) throw badRequest('mensagemRecebida e businessProfile são obrigatórios');
+
+  const prompt = `IDIOMA: ${idioma}
+
+PERFIL DO MEU NEGÓCIO:
+${JSON.stringify(businessProfile, null, 2)}
+
+${lead ? `LEAD:\n${JSON.stringify(lead, null, 2)}\n\n` : ''}${historico ? `HISTÓRICO RECENTE DA CONVERSA:\n${historico}\n\n` : ''}ÚLTIMA MENSAGEM DO LEAD (texto ou transcrição de áudio):
+"${mensagemRecebida}"
+
+Responde só com o objeto JSON.`;
+
+  const text = await callAI({ system: LIVE_ASSIST_SYSTEM, prompt, maxTokens: 800 });
   return parseJsonLoose(text);
+}
+
+// ==================================================================
+// type: "crmSend" — Envia lead + análises completas para o teu CRM (webhook genérico)
+// e, opcionalmente, dispara o envio de WhatsApp (Evolution API/Evolution Go/Z-API) e email
+// através dos teus próprios webhooks (n8n/Make à frente do teu CRM/provedor).
+// ==================================================================
+async function runCrmSend(body) {
+  const { lead, businessProfile, analise, targets } = body;
+  if (!lead || !targets) throw badRequest('lead e targets são obrigatórios');
+
+  const resultados = {};
+
+  if (targets.crmWebhookUrl) {
+    resultados.crm = await dispatchWebhook(targets.crmWebhookUrl, {
+      evento: 'lead.enviado',
+      timestamp: new Date().toISOString(),
+      lead,
+      businessProfile,
+      analise: analise || null,
+    });
+  }
+
+  if (targets.whatsappWebhookUrl) {
+    const phone = lead.Telefone || lead.telefone || '';
+    const mensagem = (analise && (analise.whatsapp1 || analise.whatsappVariacoes?.[0])) || lead['WhatsApp Msg 1'] || '';
+    if (!phone) {
+      resultados.whatsapp = { ok: false, error: 'Lead sem telefone/WhatsApp registado.' };
+    } else if (!mensagem) {
+      resultados.whatsapp = { ok: false, error: 'Sem mensagem de WhatsApp gerada para este lead ainda — usa "Abordagens" ou "Qualidade" primeiro.' };
+    } else {
+      resultados.whatsapp = await dispatchWebhook(
+        targets.whatsappWebhookUrl,
+        buildWhatsAppPayload(targets.whatsappProvider || 'evolution', phone, mensagem)
+      );
+    }
+  }
+
+  if (targets.emailWebhookUrl) {
+    const email = lead.Email || lead.email || '';
+    const assunto = (analise && analise.emailAssunto) || lead['Email Assunto'] || `Contacto — ${lead.Empresa || lead.empresa || ''}`;
+    const corpo = (analise && (analise.emailCorpo || analise.emailPlainText)) || lead['Email Corpo'] || '';
+    if (!email) {
+      resultados.email = { ok: false, error: 'Lead sem email registado.' };
+    } else if (!corpo) {
+      resultados.email = { ok: false, error: 'Sem email gerado para este lead ainda — usa "Abordagens" ou "Qualidade" primeiro.' };
+    } else {
+      resultados.email = await dispatchWebhook(targets.emailWebhookUrl, { to: email, subject: assunto, text: corpo });
+    }
+  }
+
+  return { resultados };
 }
 
 // ==================================================================
@@ -455,6 +565,8 @@ const HANDLERS = {
   cadence: runCadence,
   deliverability: runDeliverability,
   discoverNiches: runDiscoverNiches,
+  liveAssist: runLiveAssist,
+  crmSend: runCrmSend,
 };
 
 // POST { type, ...resto conforme o type acima }
@@ -465,10 +577,10 @@ export default async function handler(req, res) {
 
   try {
     requireAuth(req);
-    requireEnv(['ANTHROPIC_API_KEY']);
     const { type } = req.body || {};
     const run = HANDLERS[type];
     if (!run) return res.status(400).json({ error: `type inválido. Usa um de: ${Object.keys(HANDLERS).join(', ')}` });
+    if (type !== 'crmSend') requireEnv(['ANTHROPIC_API_KEY']); // crmSend só dispara webhooks, não chama IA
 
     const result = await run(req.body);
     res.status(200).json(result);
