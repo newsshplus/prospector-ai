@@ -26,24 +26,36 @@ function mapLead(item) {
   };
 }
 
-// POST { datasetId, baseId, tableId, businessProfile, countryCode? }
+// POST modo Apify: { datasetId, baseId, tableId, businessProfile, countryCode? }
+// POST modo fallback (DuckDuckGo/Google CSE): { leads, baseId, tableId, businessProfile }
 export default async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 
   try {
-    requireEnv(['APIFY_KEY', 'AIRTABLE_TOKEN', 'ANTHROPIC_API_KEY']);
-    const { datasetId, baseId, tableId, businessProfile, countryCode } = req.body || {};
-    if (!datasetId || !baseId || !tableId || !businessProfile) {
-      return res.status(400).json({ error: 'datasetId, baseId, tableId e businessProfile são obrigatórios' });
+    requireEnv(['AIRTABLE_TOKEN', 'ANTHROPIC_API_KEY']);
+    const { datasetId, leads: providedLeads, baseId, tableId, businessProfile, countryCode } = req.body || {};
+    if (!baseId || !tableId || !businessProfile) {
+      return res.status(400).json({ error: 'baseId, tableId e businessProfile são obrigatórios' });
     }
 
-    let items = await fetchDataset(datasetId);
-    if (countryCode) {
-      items = items.filter((it) => (it.countryCode || '').toUpperCase() === countryCode);
+    let leads;
+    if (providedLeads) {
+      // modo fallback: leads já vêm prontos do DuckDuckGo/Google CSE
+      leads = providedLeads;
+    } else if (datasetId) {
+      // modo Apify: busca o dataset e mapeia
+      requireEnv(['APIFY_KEY']);
+      let items = await fetchDataset(datasetId);
+      if (countryCode) {
+        items = items.filter((it) => (it.countryCode || '').toUpperCase() === countryCode);
+      }
+      leads = items.map(mapLead).filter((l) => l.empresa);
+    } else {
+      return res.status(400).json({ error: 'É preciso fornecer datasetId (modo Apify) ou leads (modo fallback)' });
     }
-    const leads = items.map(mapLead).filter((l) => l.empresa);
+
     if (!leads.length) return res.status(200).json({ saved: 0, message: 'Nenhum lead encontrado.' });
 
     const result = await scoreAndSaveLeads(baseId, tableId, businessProfile, leads);

@@ -366,7 +366,7 @@ async function runScrape(){
     if(start.mode === 'sync'){
       const sourceLabel = start.source === 'duckduckgo' ? 'DuckDuckGo' : 'Google Custom Search';
       setStatus('sc-status', 'Apify indisponível — a usar fallback (' + sourceLabel + '), ' + start.leads.length + ' resultados. A pontuar com IA…');
-      const finishR = await fetch('/api/scrape-finish-sync', {
+      const finishR = await fetch('/api/scrape-finish', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ leads: start.leads, baseId, tableId, businessProfile: profile })
       });
