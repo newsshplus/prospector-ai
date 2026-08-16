@@ -1,1 +1,1044 @@
-PLACEHOLDER_WILL_BE_REPLACED
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prospector AI · CriaHub Global</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-deep:#0D2B4E;
+    --navy-mid:#1A5276;
+    --blue:#2E86C1;
+    --blue-bright:#5DADE2;
+    --ink:#0A1E33;
+    --paper:#F5F8FB;
+    --card:#FFFFFF;
+    --line:#DCE6EF;
+    --muted:#5B7186;
+    --scoreA:#1E8E5A;
+    --scoreA-bg:#E4F6ED;
+    --scoreB:#B9791E;
+    --scoreB-bg:#FCF1DC;
+    --scoreC:#7A8AA0;
+    --scoreC-bg:#EEF2F6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter',sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  h1,h2,h3,.display{ font-family:'Space Grotesk',sans-serif; }
+  code, .mono{ font-family:'JetBrains Mono',monospace; }
+
+  header.top{
+    background:linear-gradient(120deg,var(--navy-deep),var(--navy-mid) 70%);
+    color:#fff;
+    padding:28px 32px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  header.top .brand{ display:flex; align-items:center; gap:14px; }
+  header.top .mark{
+    width:42px;height:42px;border-radius:10px;
+    background:var(--blue);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;
+  }
+  header.top h1{ margin:0; font-size:22px; letter-spacing:-0.01em; }
+  header.top p{ margin:2px 0 0; color:#BFD7EA; font-size:13px; }
+
+  main{ max-width:1180px; margin:0 auto; padding:28px 20px 80px; }
+
+  .grid{ display:grid; grid-template-columns:340px 1fr; gap:22px; align-items:start; }
+  @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px;
+  }
+  .card h2{ font-size:15px; margin:0 0 14px; color:var(--navy-deep); display:flex; align-items:center; gap:8px;}
+  .card h2 .num{
+    width:22px;height:22px;border-radius:6px;background:var(--navy-deep);color:#fff;
+    display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-family:'JetBrains Mono';
+  }
+
+  label{ display:block; font-size:12px; font-weight:600; color:var(--muted); margin:12px 0 4px; }
+  label:first-of-type{ margin-top:0; }
+  input,textarea,select{
+    width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:8px;
+    font-family:inherit; font-size:13.5px; background:#fff; color:var(--ink);
+  }
+  textarea{ resize:vertical; min-height:64px; }
+  input:focus,textarea:focus,select:focus{ outline:2px solid var(--blue-bright); outline-offset:1px; border-color:var(--blue);}
+
+  button{
+    font-family:inherit; font-weight:600; font-size:13.5px; cursor:pointer;
+    border-radius:8px; border:none; padding:10px 16px;
+  }
+  .btn-primary{ background:var(--blue); color:#fff; }
+  .btn-primary:hover{ background:var(--navy-mid); }
+  .btn-primary:disabled{ background:#A9C6DC; cursor:not-allowed; }
+  .btn-ghost{ background:transparent; color:var(--navy-mid); border:1px solid var(--line); }
+  .btn-ghost:hover{ background:var(--paper); }
+  .btn-small{ padding:6px 10px; font-size:12px; }
+  .row-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+
+  .status-line{ font-size:12.5px; color:var(--muted); margin-top:10px; min-height:16px; }
+  .status-line.err{ color:#B3261E; }
+  .status-line.ok{ color:var(--scoreA); }
+
+  .progress{ height:6px; border-radius:4px; background:var(--line); overflow:hidden; margin-top:10px; display:none; }
+  .progress.show{ display:block; }
+  .progress > div{ height:100%; width:30%; background:var(--blue); animation:slide 1.1s infinite ease-in-out; }
+  @keyframes slide{ 0%{ margin-left:-30%; } 100%{ margin-left:100%; } }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  thead th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line);
+  }
+  tbody td{ padding:10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tbody tr:hover{ background:#FAFCFE; }
+  .empresa{ font-weight:600; color:var(--navy-deep); }
+  .dor{ color:var(--muted); font-size:12.5px; max-width:260px; }
+
+  .badge{ display:inline-block; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:700; }
+  .badge.A{ background:var(--scoreA-bg); color:var(--scoreA); }
+  .badge.B{ background:var(--scoreB-bg); color:var(--scoreB); }
+  .badge.C{ background:var(--scoreC-bg); color:var(--scoreC); }
+
+  .empty{ padding:40px 20px; text-align:center; color:var(--muted); font-size:13.5px; }
+
+  .modal-bg{
+    display:none; position:fixed; inset:0; background:rgba(10,30,51,.55);
+    align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal-bg.show{ display:flex; }
+  .modal{
+    background:#fff; border-radius:14px; max-width:640px; width:100%;
+    max-height:86vh; overflow-y:auto; padding:24px;
+  }
+  .modal h3{ margin:0 0 4px; color:var(--navy-deep); }
+  .modal .sub{ color:var(--muted); font-size:12.5px; margin-bottom:18px; }
+  .block{ margin-bottom:16px; }
+  .block .label{ font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--navy-mid); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
+  .block pre{
+    background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:12px;
+    white-space:pre-wrap; font-family:'JetBrains Mono',monospace; font-size:12px; margin:0; color:var(--ink);
+  }
+  .copy-btn{ background:none; border:none; color:var(--blue); font-size:11.5px; font-weight:600; cursor:pointer; padding:0; }
+  .close-x{ float:right; background:none; border:none; font-size:20px; color:var(--muted); cursor:pointer; }
+  details.payloads{ margin-top:6px; }
+  details.payloads summary{ cursor:pointer; font-size:12px; color:var(--navy-mid); font-weight:600; }
+
+  .login-gate{
+    position:fixed; inset:0; background:linear-gradient(135deg,var(--navy-deep),var(--navy-mid));
+    display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;
+  }
+  .login-gate.hide{ display:none; }
+  .login-box{ background:#fff; border-radius:16px; padding:32px; max-width:340px; width:100%; }
+  .login-box h1{ margin:0 0 4px; font-size:20px; color:var(--navy-deep); }
+  .login-box p{ margin:0 0 18px; color:var(--muted); font-size:13px; }
+  .login-box input{ margin-bottom:10px; }
+  .login-box button{ width:100%; }
+  #app-root{ display:none; }
+  #app-root.show{ display:block; }
+</style>
+</head>
+<body>
+
+<div class="login-gate" id="login-gate">
+  <div class="login-box">
+    <h1>🔒 Prospector AI</h1>
+    <p>Este painel usa IA paga (Claude/Groq) — acesso restrito.</p>
+    <input id="login-password" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="btn-primary" onclick="doLogin()">Entrar</button>
+    <div id="login-status" class="status-line"></div>
+  </div>
+</div>
+
+<div id="app-root">
+
+<header class="top">
+  <div class="brand">
+    <div class="mark">PA</div>
+    <div>
+      <h1>Prospector AI</h1>
+      <p>Deep matching · ICP score · outreach omnichannel</p>
+    </div>
+  </div>
+  <button class="btn-ghost btn-small" style="color:#fff; border-color:rgba(255,255,255,.4);" onclick="doLogout()">Sair</button>
+</header>
+
+<main>
+  <div class="grid">
+    <!-- COLUNA ESQUERDA: configuração -->
+    <div style="display:flex; flex-direction:column; gap:18px;">
+
+      <div class="card">
+        <h2><span class="num">1</span> Perfil do meu negócio</h2>
+        <label>URL do site</label>
+        <input id="pf-url" placeholder="https://criahub.global" />
+        <label>Descrição da oferta / serviços</label>
+        <textarea id="pf-desc" placeholder="Ex: Agência de tráfego pago e automação com IA para PMEs em Portugal, Espanha e Brasil"></textarea>
+        <label>Ticket médio e ICP</label>
+        <textarea id="pf-icp" placeholder="Ex: Empresas com 10-200 colaboradores, orçamento de marketing >1000€/mês"></textarea>
+        <div class="row-actions"><button class="btn-ghost btn-small" onclick="saveProfile()">Guardar perfil</button></div>
+        <div id="pf-status" class="status-line"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">2</span> Base Airtable</h2>
+        <label>Base ID</label>
+        <input id="at-base" placeholder="appXXXXXXXXXXXXXX" />
+        <label>Table ID</label>
+        <input id="at-table" placeholder="tblXXXXXXXXXXXXXX" />
+        <div class="row-actions">
+          <button class="btn-primary btn-small" onclick="saveAirtable()">Guardar</button>
+          <button class="btn-ghost btn-small" onclick="initBase()">Criar base nova</button>
+        </div>
+        <div id="at-status" class="status-line"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">3</span> Nova prospecção</h2>
+        <label>Localização-alvo (para descoberta automática de nicho)</label>
+        <input id="sc-loc" placeholder="Ex: Cascais, Portugal" />
+        <div class="row-actions"><button class="btn-ghost btn-small" onclick="discoverNiches()">🔍 Descobrir nichos automaticamente</button></div>
+        <div id="niches-wrap"></div>
+        <label style="margin-top:14px;">Nicho <span style="font-weight:400; text-transform:none; letter-spacing:0;">(opcional — deixa vazio para a IA escolher o melhor automaticamente)</span></label>
+        <input id="sc-niche" placeholder="Ex: casas modulares — ou deixa vazio" />
+        <label>Zona</label>
+        <input id="sc-zone" placeholder="Ex: Cascais, Portugal (ou usa a localização-alvo acima)" />
+        <label>Máx. resultados</label>
+        <input id="sc-max" type="number" value="40" />
+        <label>Idioma da abordagem</label>
+        <select id="sc-lang">
+          <option>Português de Portugal (PT-PT)</option>
+          <option>Português do Brasil (PT-BR)</option>
+          <option>Español (España)</option>
+        </select>
+        <div class="row-actions"><button class="btn-primary" id="sc-btn" onclick="runScrape()">Iniciar scraping</button></div>
+        <div class="progress" id="sc-progress"><div></div></div>
+        <div id="sc-status" class="status-line"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">4</span> Integrações de envio</h2>
+        <p style="font-size:12px; color:var(--muted); margin:0 0 10px;">
+          <strong>Webhook do CRM (CriaHub Ads):</strong> no CriaHub Ads vai a
+          <em>Empresas → a tua organização → separador Webhooks → "Entrada (receber)" → Novo endpoint</em>.
+          Copia a URL gerada (termina em <code>/hub-webhook/&lt;slug&gt;</code>) — e o token secreto, se ativares
+          "Proteger com token secreto" — e cola abaixo. Os leads/análises ficam visíveis nesse endpoint
+          dentro do CriaHub Ads para reveres ou automatizares a seguir.
+        </p>
+        <label>Webhook do CRM (CriaHub Ads — lead + análises completas)</label>
+        <input id="int-crm" placeholder="https://SEU-PROJETO.supabase.co/functions/v1/hub-webhook/xxxxx">
+        <label>Token secreto do CRM (opcional, só se ativaste proteção)</label>
+        <input id="int-crm-token" placeholder="deixa vazio se o endpoint não tiver proteção">
+        <label style="margin-top:14px;">Provedor de WhatsApp</label>
+        <select id="int-wa-provider">
+          <option value="evolution">Evolution API</option>
+          <option value="evolution-go">Evolution Go</option>
+          <option value="zapi">Z-API</option>
+        </select>
+        <label>Webhook de envio WhatsApp</label>
+        <input id="int-wa" placeholder="https://...">
+        <label>Webhook de envio Email</label>
+        <input id="int-email" placeholder="https://...">
+        <div class="row-actions"><button class="btn-ghost btn-small" onclick="saveIntegrations()">Guardar integrações</button></div>
+        <div id="int-status" class="status-line"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">5</span> Live Assist <span style="font-weight:400; text-transform:none; letter-spacing:0; font-size:11px; color:var(--muted);">(sugestão quase-instantânea, não é escuta contínua de áudio)</span></h2>
+        <label>Mensagem recebida (WhatsApp) ou fala transcrita da chamada</label>
+        <textarea id="la-msg" placeholder="Cola aqui a última mensagem do lead…"></textarea>
+        <label>Ou grava/carrega um áudio curto (transcreve automaticamente)</label>
+        <input id="la-audio" type="file" accept="audio/*" onchange="transcribeAudioFile(this)">
+        <div class="row-actions"><button class="btn-primary btn-small" onclick="runLiveAssist()">⚡ Sugerir resposta agora</button></div>
+        <div id="la-status" class="status-line"></div>
+        <div id="la-result"></div>
+      </div>
+
+    </div>
+
+    <!-- COLUNA DIREITA: pipeline -->
+    <div class="card">
+      <h2 style="display:flex; justify-content:space-between; align-items:center;">
+        <span><span class="num">6</span> Pipeline de leads</span>
+        <span style="display:flex; gap:8px;">
+          <button class="btn-ghost btn-small" onclick="loadLeads()">↻ Atualizar</button>
+          <button class="btn-ghost btn-small" onclick="openReport()">📊 Relatório CRO</button>
+        </span>
+      </h2>
+      <div id="leads-wrap">
+        <div class="empty">Configura a base Airtable e corre uma prospecção para veres leads aqui.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <button class="close-x" onclick="closeModal()">×</button>
+    <h3 id="m-empresa">—</h3>
+    <div class="sub" id="m-sub">—</div>
+    <div id="m-body">A gerar abordagens…</div>
+  </div>
+</div>
+
+</div><!-- /#app-root -->
+
+<script>
+const LS = {
+  profile: 'pai_profile',
+  airtable: 'pai_airtable',
+  integrations: 'pai_integrations',
+};
+
+async function doLogin(){
+  const password = document.getElementById('login-password').value;
+  const statusEl = document.getElementById('login-status');
+  if(!password) return;
+  statusEl.textContent = 'A entrar…';
+  statusEl.className = 'status-line';
+  try{
+    const r = await fetch('/api/auth', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ password })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error || 'Password incorreta.');
+    document.getElementById('login-gate').classList.add('hide');
+    document.getElementById('app-root').classList.add('show');
+    restoreProfile();
+    restoreAirtable();
+    restoreIntegrations();
+    loadLeads();
+  }catch(e){
+    statusEl.textContent = e.message;
+    statusEl.className = 'status-line err';
+  }
+}
+
+async function doLogout(){
+  try{ await fetch('/api/auth', { method:'DELETE' }); }catch{}
+  document.getElementById('app-root').classList.remove('show');
+  document.getElementById('login-gate').classList.remove('hide');
+  document.getElementById('login-password').value = '';
+}
+
+// Se já existir sessão válida (cookie ainda não expirou), tenta entrar direto
+// chamando qualquer endpoint protegido leve; se der 401, mostra o login.
+(async function checkSession(){
+  try{
+    const r = await fetch('/api/leads?baseId=x&tableId=x');
+    if(r.status !== 401){
+      document.getElementById('login-gate').classList.add('hide');
+      document.getElementById('app-root').classList.add('show');
+      restoreProfile();
+      restoreAirtable();
+      restoreIntegrations();
+      loadLeads();
+    }
+  }catch{}
+})();
+
+function loadJSON(key, fallback){ try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; } }
+function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+function getProfile(){
+  return {
+    siteUrl: document.getElementById('pf-url').value.trim(),
+    descricao: document.getElementById('pf-desc').value.trim(),
+    icp: document.getElementById('pf-icp').value.trim(),
+  };
+}
+function saveProfile(){
+  saveJSON(LS.profile, getProfile());
+  setStatus('pf-status', 'Perfil guardado localmente neste browser.', 'ok');
+}
+function restoreProfile(){
+  const p = loadJSON(LS.profile, null);
+  if(!p) return;
+  document.getElementById('pf-url').value = p.siteUrl || '';
+  document.getElementById('pf-desc').value = p.descricao || '';
+  document.getElementById('pf-icp').value = p.icp || '';
+}
+
+function getAirtable(){
+  return {
+    baseId: document.getElementById('at-base').value.trim(),
+    tableId: document.getElementById('at-table').value.trim(),
+  };
+}
+function saveAirtable(){
+  saveJSON(LS.airtable, getAirtable());
+  setStatus('at-status', 'Base guardada. A carregar leads…', 'ok');
+  loadLeads();
+}
+function restoreAirtable(){
+  const a = loadJSON(LS.airtable, null);
+  if(!a) return;
+  document.getElementById('at-base').value = a.baseId || '';
+  document.getElementById('at-table').value = a.tableId || '';
+}
+
+function setStatus(id, msg, cls){
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'status-line' + (cls ? ' ' + cls : '');
+}
+
+async function discoverNiches(){
+  const localizacao = document.getElementById('sc-loc').value.trim();
+  const wrap = document.getElementById('niches-wrap');
+  if(!localizacao) return alert('Preenche a localização-alvo primeiro.');
+  const profile = getProfile();
+
+  wrap.innerHTML = '<div class="status-line">A analisar o perfil (todos os teus serviços) e a descobrir nichos…</div>';
+  try{
+    const data = await discoverNichesData(localizacao, profile);
+    let html = '';
+    if(data.aviso){
+      html += '<div class="status-line err">' + esc(data.aviso) + '</div>';
+    }
+    if(data.dores && data.dores.length){
+      html += '<div class="status-line" style="margin-top:8px;"><strong>Dores identificadas:</strong> ' + esc(data.dores.join(' · ')) + '</div>';
+    }
+    (data.nichos || []).forEach((n) => {
+      html += '<div style="border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:8px;">' +
+        '<div style="font-weight:600; color:var(--navy-deep); font-size:13px;">#' + n.rank + ' — ' + esc(n.nicho) + '</div>' +
+        '<div class="dor" style="margin:2px 0;">' + esc(n.justificacao) + '</div>' +
+        '<div class="dor" style="margin:2px 0 6px; color:var(--scoreA);">Ticket estimado: ' + esc(n.ticketMedioEstimado || '—') + '</div>' +
+        '<button class="btn-ghost btn-small" onclick="useNiche(' + "'" + n.queryPesquisa.replace(/'/g,"\\'") + "'" + ',' + "'" + localizacao.replace(/'/g,"\\'") + "'" + ')">Usar este nicho</button>' +
+      '</div>';
+    });
+    wrap.innerHTML = html;
+  }catch(e){
+    wrap.innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+async function discoverNichesData(localizacao, profile){
+  const r = await fetch('/api/ai', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ type: 'discoverNiches', businessProfile: profile, localizacao })
+  });
+  const data = await r.json();
+  if(!r.ok) throw new Error(data.error);
+  return data;
+}
+
+function useNiche(query, localizacao){
+  document.getElementById('sc-niche').value = query;
+  document.getElementById('sc-zone').value = localizacao;
+}
+
+function getIntegrations(){
+  return {
+    crmWebhookUrl: document.getElementById('int-crm').value.trim(),
+    crmSecretToken: document.getElementById('int-crm-token').value.trim(),
+    whatsappProvider: document.getElementById('int-wa-provider').value,
+    whatsappWebhookUrl: document.getElementById('int-wa').value.trim(),
+    emailWebhookUrl: document.getElementById('int-email').value.trim(),
+  };
+}
+function saveIntegrations(){
+  saveJSON(LS.integrations, getIntegrations());
+  setStatus('int-status', 'Integrações guardadas localmente neste browser.', 'ok');
+}
+function restoreIntegrations(){
+  const i = loadJSON(LS.integrations, null);
+  if(!i) return;
+  document.getElementById('int-crm').value = i.crmWebhookUrl || '';
+  document.getElementById('int-crm-token').value = i.crmSecretToken || '';
+  document.getElementById('int-wa-provider').value = i.whatsappProvider || 'evolution';
+  document.getElementById('int-wa').value = i.whatsappWebhookUrl || '';
+  document.getElementById('int-email').value = i.emailWebhookUrl || '';
+}
+
+async function transcribeAudioFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('la-status');
+  statusEl.textContent = 'A transcrever áudio…';
+  statusEl.className = 'status-line';
+  try{
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const r = await fetch('/api/transcribe', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ audioBase64: base64, mimeType: file.type || 'audio/webm' })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    document.getElementById('la-msg').value = data.transcript;
+    statusEl.textContent = 'Transcrito. A gerar sugestão…';
+    await runLiveAssist();
+  }catch(e){
+    statusEl.textContent = 'Erro na transcrição: ' + e.message;
+    statusEl.className = 'status-line err';
+  }
+}
+
+async function runLiveAssist(){
+  const mensagemRecebida = document.getElementById('la-msg').value.trim();
+  const statusEl = document.getElementById('la-status');
+  const resultEl = document.getElementById('la-result');
+  if(!mensagemRecebida) return alert('Escreve ou transcreve uma mensagem primeiro.');
+  const profile = getProfile();
+  if(!profile.descricao) return alert('Preenche o perfil do teu negócio (passo 1) primeiro.');
+
+  statusEl.textContent = 'A pensar na melhor resposta…';
+  statusEl.className = 'status-line';
+  resultEl.innerHTML = '';
+  try{
+    const idioma = document.getElementById('sc-lang').value;
+    const r = await fetch('/api/ai', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'liveAssist', mensagemRecebida, businessProfile: profile, idioma })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    statusEl.textContent = '';
+    resultEl.innerHTML =
+      '<div class="block"><div class="label">Leitura da situação</div><pre>' + esc(data.leituraDaSituacao) + '</pre></div>' +
+      '<div class="block"><div class="label"><span>Resposta sugerida</span><button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(data.respostaSugerida) + '">copiar</button></div><pre>' + esc(data.respostaSugerida) + '</pre></div>' +
+      '<div class="block"><div class="label">Próximo passo</div><pre>' + esc(data.proximoPasso) + '</pre></div>';
+  }catch(e){
+    statusEl.textContent = 'Erro: ' + e.message;
+    statusEl.className = 'status-line err';
+  }
+}
+
+async function initBase(){
+  setStatus('at-status', 'A criar base no Airtable…');
+  try{
+    const r = await fetch('/api/airtable-init', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}) });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    document.getElementById('at-base').value = data.baseId;
+    document.getElementById('at-table').value = data.tableId;
+    saveAirtable();
+    setStatus('at-status', 'Base "' + data.name + '" criada com sucesso.', 'ok');
+  }catch(e){
+    setStatus('at-status', 'Erro: ' + e.message, 'err');
+  }
+}
+
+async function runScrape(){
+  let niche = document.getElementById('sc-niche').value.trim();
+  let zone = document.getElementById('sc-zone').value.trim() || document.getElementById('sc-loc').value.trim();
+  const maxResults = parseInt(document.getElementById('sc-max').value, 10) || 40;
+  const idioma = document.getElementById('sc-lang').value;
+  const { baseId, tableId } = getAirtable();
+  const profile = getProfile();
+
+  if(!zone) return setStatus('sc-status', 'Preenche a zona (ou a localização-alvo, passo 3).', 'err');
+  if(!baseId || !tableId) return setStatus('sc-status', 'Configura a base Airtable primeiro (passo 2).', 'err');
+  if(!profile.descricao) return setStatus('sc-status', 'Preenche o perfil do teu negócio (passo 1).', 'err');
+
+  const btn = document.getElementById('sc-btn');
+  btn.disabled = true;
+  document.getElementById('sc-progress').classList.add('show');
+
+  try{
+    // Nicho não é obrigatório: se estiver vazio, a IA escolhe o melhor nicho automaticamente
+    // a partir de TODOS os serviços do teu perfil (conversão + ticket médio).
+    if(!niche){
+      setStatus('sc-status', 'Sem nicho definido — a IA vai escolher o melhor automaticamente a partir do teu perfil…');
+      const data = await discoverNichesData(zone, profile);
+      const top = (data.nichos || []).find(n => n.rank === 1) || (data.nichos || [])[0];
+      if(!top) throw new Error('Não foi possível descobrir um nicho automaticamente — preenche o Nicho manualmente.');
+      niche = top.queryPesquisa;
+      document.getElementById('sc-niche').value = niche;
+      setStatus('sc-status', 'Nicho escolhido automaticamente: "' + niche + '" (ticket estimado: ' + (top.ticketMedioEstimado || '—') + '). A iniciar scraping…');
+    } else {
+      setStatus('sc-status', 'A iniciar scraping no Google Maps…');
+    }
+
+    const startR = await fetch('/api/scrape-start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ niche, zone, maxResults }) });
+    const start = await startR.json();
+    if(!startR.ok) throw new Error(start.error);
+
+    if(start.mode === 'sync'){
+      const sourceLabel = start.source === 'duckduckgo' ? 'DuckDuckGo' : 'Google Custom Search';
+      setStatus('sc-status', 'Apify indisponível — a usar fallback (' + sourceLabel + '), ' + start.leads.length + ' resultados. A pontuar com IA…');
+      const finishR = await fetch('/api/scrape-finish', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ leads: start.leads, baseId, tableId, businessProfile: profile })
+      });
+      const finish = await finishR.json();
+      if(!finishR.ok) throw new Error(finish.error);
+      setStatus('sc-status', finish.saved + ' leads gravados via fallback (' + sourceLabel + '). Nota: menos completos que o Apify (sem telefone/rating).', 'ok');
+      loadLeads();
+      return;
+    }
+
+    let status, datasetId;
+    while(true){
+      await new Promise(r => setTimeout(r, 4000));
+      const statR = await fetch('/api/scrape-status?runId=' + start.runId);
+      const stat = await statR.json();
+      if(!statR.ok) throw new Error(stat.error);
+      status = stat.status; datasetId = stat.datasetId;
+      setStatus('sc-status', 'Estado: ' + status + ' · leads encontrados: ' + stat.itemCount);
+      if(['SUCCEEDED','FAILED','ABORTED','TIMED-OUT'].includes(status)) break;
+    }
+    if(status !== 'SUCCEEDED') throw new Error('O scraping terminou com estado ' + status);
+
+    setStatus('sc-status', 'A calcular ICP score com IA e a gravar no Airtable…');
+    const finishR = await fetch('/api/scrape-finish', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ datasetId, baseId, tableId, businessProfile: profile, countryCode: start.countryCode })
+    });
+    const finish = await finishR.json();
+    if(!finishR.ok) throw new Error(finish.error);
+
+    setStatus('sc-status', finish.saved + ' leads gravados no pipeline.', 'ok');
+    loadLeads();
+  }catch(e){
+    setStatus('sc-status', 'Erro: ' + e.message, 'err');
+  }finally{
+    btn.disabled = false;
+    document.getElementById('sc-progress').classList.remove('show');
+  }
+}
+
+function scoreLetter(classificacao){
+  if(!classificacao) return 'C';
+  if(classificacao.startsWith('Score A')) return 'A';
+  if(classificacao.startsWith('Score B')) return 'B';
+  return 'C';
+}
+
+function prioLetter(prioridade, intentScore){
+  if(prioridade){
+    if(prioridade.startsWith('Alta')) return 'A';
+    if(prioridade.startsWith('Média')) return 'B';
+    return 'C';
+  }
+  if(typeof intentScore === 'number'){
+    if(intentScore > 80) return 'A';
+    if(intentScore >= 50) return 'B';
+  }
+  return 'C';
+}
+
+let currentLeads = [];
+
+async function loadLeads(){
+  const { baseId, tableId } = getAirtable();
+  const wrap = document.getElementById('leads-wrap');
+  if(!baseId || !tableId){
+    wrap.innerHTML = '<div class="empty">Configura a base Airtable e corre uma prospecção para veres leads aqui.</div>';
+    return;
+  }
+  wrap.innerHTML = '<div class="empty">A carregar…</div>';
+  try{
+    const r = await fetch('/api/leads?baseId=' + encodeURIComponent(baseId) + '&tableId=' + encodeURIComponent(tableId));
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    currentLeads = data.leads.sort((a,b) => (b['ICP Score']||0) - (a['ICP Score']||0));
+    renderLeads();
+  }catch(e){
+    wrap.innerHTML = '<div class="empty">Erro a carregar leads: ' + e.message + '</div>';
+  }
+}
+
+function renderLeads(){
+  const wrap = document.getElementById('leads-wrap');
+  if(!currentLeads.length){
+    wrap.innerHTML = '<div class="empty">Ainda não há leads nesta base.</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>Empresa</th><th>ICP</th><th>Intent</th><th>Dor identificada</th><th>Status</th><th></th></tr></thead><tbody>';
+  currentLeads.forEach((l, i) => {
+    const letter = scoreLetter(l['Classificação']);
+    const intentScore = l['Intent Score'];
+    const prio = l['Prioridade de Disparo'];
+    const intentLetter = prioLetter(prio, intentScore);
+    const intentCell = (intentScore !== undefined && intentScore !== null)
+      ? '<span class="badge ' + intentLetter + '">' + intentScore + '</span>'
+      : '<span class="dor">—</span>';
+    html += '<tr>' +
+      '<td><div class="empresa">' + esc(l.Empresa || '—') + '</div><div class="dor">' + esc(l.Website || l['Google Maps'] || '') + '</div>' +
+      (l.Cargo || l.Decisor ? '<div class="dor">' + esc([l.Decisor, l.Cargo].filter(Boolean).join(' · ')) + '</div>' : '') +
+      (l.Moeda ? '<div class="dor">💱 ' + esc(l.Moeda) + '</div>' : '') + '</td>' +
+      '<td><span class="badge ' + letter + '">' + (l['ICP Score'] ?? '—') + '</span></td>' +
+      '<td>' + intentCell + '</td>' +
+      '<td class="dor">' + esc(l['Dor Identificada'] || '—') + '</td>' +
+      '<td>' + esc(l.Status || 'Novo') + '</td>' +
+      '<td style="white-space:nowrap;">' +
+        '<button class="btn-ghost btn-small" onclick="openEnrich(' + i + ')">Enriquecer</button> ' +
+        '<button class="btn-ghost btn-small" onclick="openOutreach(' + i + ')">Abordagens</button> ' +
+        '<button class="btn-ghost btn-small" onclick="openDeliverability(' + i + ')">Qualidade</button> ' +
+        '<button class="btn-ghost btn-small" onclick="openObjections(' + i + ')">Objeções</button> ' +
+        '<button class="btn-ghost btn-small" onclick="openCadence(' + i + ')">Cadência 21d</button> ' +
+        '<button class="btn-ghost btn-small" onclick="openSend(' + i + ')">📤 Enviar</button>' +
+      '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function openEnrich(i){
+  const lead = currentLeads[i];
+  const { baseId, tableId } = getAirtable();
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = 'Enriquecimento BANT+ e tech stack';
+  document.getElementById('m-body').innerHTML = 'A investigar decisor, urgência e tech stack (pesquisa web)… pode demorar 20-40s.';
+  document.getElementById('modal-bg').classList.add('show');
+
+  try{
+    const r = await fetch('/api/ai', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'enrich', lead, businessProfile: getProfile(), baseId, tableId, recordId: lead.id })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderEnrich(data.enrichment);
+    loadLeads();
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderEnrich(e){
+  const body = document.getElementById('m-body');
+  const letter = prioLetter(e.prioridade, e.intentScore);
+  let html = '<div class="block"><div class="label">Intent Score</div>' +
+    '<pre><span class="badge ' + letter + '" style="font-size:16px;">' + e.intentScore + '</span> — ' + esc(e.prioridade || '') + '</pre></div>';
+  html += '<div class="block"><div class="label">Decisor-chave</div><pre>' + esc([e.decisorChave, e.cargo].filter(Boolean).join(' · ') || 'Não identificado') + '</pre></div>';
+  html += '<div class="block"><div class="label">Authority</div><pre>' + esc(e.authority || '—') + '</pre></div>';
+  html += '<div class="block"><div class="label">Need — 3 falhas identificadas</div><pre>' + esc((e.need || []).map((n,i)=> (i+1)+'. '+n).join('\n')) + '</pre></div>';
+  html += '<div class="block"><div class="label">Timeline / urgência</div><pre>' + esc(e.timeline || '—') + '</pre></div>';
+  html += '<div class="block"><div class="label">Budget estimado</div><pre>' + esc(e.budget || '—') + '</pre></div>';
+  html += '<div class="block"><div class="label">Tech stack</div><pre>' + esc((e.techStack || []).join(', ') || '—') + '</pre></div>';
+  body.innerHTML = html;
+}
+
+async function openDeliverability(i){
+  const lead = currentLeads[i];
+  const { baseId, tableId } = getAirtable();
+  const idioma = document.getElementById('sc-lang').value;
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = 'Qualidade das mensagens e entregabilidade de email';
+  document.getElementById('m-body').innerHTML = 'A gerar variações e a verificar o domínio de email…';
+  document.getElementById('modal-bg').classList.add('show');
+
+  try{
+    const r = await fetch('/api/ai', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'deliverability', lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderDeliverability(data);
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function checkBadge(ok){
+  return '<span class="badge ' + (ok ? 'A' : 'C') + '">' + (ok ? 'OK' : 'em falta') + '</span>';
+}
+
+function renderDeliverability(data){
+  const body = document.getElementById('m-body');
+  const ec = data.emailCheck;
+  let html = '';
+
+  if(ec && ec.domain){
+    html += '<div class="block"><div class="label">Verificação do domínio de email (' + esc(ec.domain) + ')</div>' +
+      '<pre>MX ' + checkBadge(ec.mx) + '   SPF ' + checkBadge(ec.spf) + '   DMARC ' + checkBadge(ec.dmarc) + '   DKIM ' + checkBadge(!!ec.dkimSelectorFound) + '\n' +
+      (ec.notes && ec.notes.length ? '\n' + ec.notes.join('\n') : '') +
+      '\n\nNota: a verificação de DKIM é best-effort (só testa seletores comuns) — a ausência de deteção não prova que o DKIM está mal configurado.' +
+      '</pre></div>';
+  } else {
+    html += '<div class="block"><div class="label">Email</div><pre>Este lead não tem email registado — sem verificação de domínio.</pre></div>';
+  }
+
+  if(data.avisos && data.avisos.length){
+    html += '<div class="block"><div class="label">Avisos</div><pre class="status-line err" style="white-space:pre-wrap;">' + esc(data.avisos.join('\n')) + '</pre></div>';
+  }
+
+  (data.whatsappVariacoes || []).forEach((v, idx) => {
+    html += '<div class="block"><div class="label"><span>WhatsApp — variação ' + (idx+1) + '</span>' +
+      '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(v) + '">copiar</button></div>' +
+      '<pre>' + esc(v) + '</pre></div>';
+  });
+
+  html += '<div class="block"><div class="label"><span>Email — plain text</span>' +
+    '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(data.emailPlainText) + '">copiar</button></div>' +
+    '<pre>' + esc(data.emailPlainText) + '</pre></div>';
+
+  body.innerHTML = html;
+}
+
+async function openObjections(i){
+  const lead = currentLeads[i];
+  const { baseId, tableId } = getAirtable();
+  const idioma = document.getElementById('sc-lang').value;
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = 'Roteiro anti-objeção para chamada ao vivo';
+  document.getElementById('m-body').innerHTML = 'A preparar os roteiros de objeção…';
+  document.getElementById('modal-bg').classList.add('show');
+
+  try{
+    const r = await fetch('/api/ai', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'objections', lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderObjections(data);
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderObjections(data){
+  const body = document.getElementById('m-body');
+  let html = '';
+  (data.objecoes || []).forEach((o, idx) => {
+    html += '<div class="block"><div class="label"><span>Objeção ' + (idx+1) + ': ' + esc(o.objecao) + '</span>' +
+      '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(o.resposta) + '">copiar</button></div>' +
+      '<pre>' + esc(o.resposta) + '</pre></div>';
+  });
+  if(data.fechamento && data.fechamento.length){
+    html += '<div class="block"><div class="label">Frases de fecho (para agendar reunião)</div><pre>' +
+      esc(data.fechamento.map((f,i)=> (i+1)+'. '+f).join('\n')) + '</pre></div>';
+  }
+  body.innerHTML = html;
+}
+
+async function openSend(i){
+  const lead = currentLeads[i];
+  const integ = getIntegrations();
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = 'Enviar lead + análises para CRM/WhatsApp/Email';
+  document.getElementById('modal-bg').classList.add('show');
+
+  const hasCrm = !!integ.crmWebhookUrl;
+  const hasWa = !!integ.whatsappWebhookUrl;
+  const hasEmail = !!integ.emailWebhookUrl;
+
+  if(!hasCrm && !hasWa && !hasEmail){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Configura pelo menos um webhook em "Integrações de envio" (passo 4) primeiro.</div>';
+    return;
+  }
+
+  let html = '<div class="block"><div class="label">Escolhe os canais</div>' +
+    '<label style="display:flex; align-items:center; gap:8px; font-weight:400; text-transform:none; letter-spacing:0;"><input type="checkbox" id="send-crm" ' + (hasCrm?'checked':'disabled') + ' style="width:auto;"> CriaHub Ads (CRM)' + (hasCrm?'':' (webhook não configurado)') + '</label>' +
+    '<label style="display:flex; align-items:center; gap:8px; font-weight:400; text-transform:none; letter-spacing:0; margin-top:6px;"><input type="checkbox" id="send-wa" ' + (hasWa?'checked':'disabled') + ' style="width:auto;"> WhatsApp (' + esc(integ.whatsappProvider) + ')' + (hasWa?'':' (webhook não configurado)') + '</label>' +
+    '<label style="display:flex; align-items:center; gap:8px; font-weight:400; text-transform:none; letter-spacing:0; margin-top:6px;"><input type="checkbox" id="send-email" ' + (hasEmail?'checked':'disabled') + ' style="width:auto;"> Email' + (hasEmail?'':' (webhook não configurado)') + '</label>' +
+    '</div><div class="row-actions"><button class="btn-primary" onclick="confirmSend(' + i + ')">Enviar agora</button></div><div id="send-status" class="status-line"></div>';
+  document.getElementById('m-body').innerHTML = html;
+}
+
+async function confirmSend(i){
+  const lead = currentLeads[i];
+  const integ = getIntegrations();
+  const statusEl = document.getElementById('send-status');
+  statusEl.textContent = 'A enviar…';
+  statusEl.className = 'status-line';
+
+  const targets = {};
+  if(document.getElementById('send-crm').checked && !document.getElementById('send-crm').disabled){ targets.crmWebhookUrl = integ.crmWebhookUrl; if(integ.crmSecretToken) targets.crmSecretToken = integ.crmSecretToken; }
+  if(document.getElementById('send-wa').checked && !document.getElementById('send-wa').disabled){ targets.whatsappWebhookUrl = integ.whatsappWebhookUrl; targets.whatsappProvider = integ.whatsappProvider; }
+  if(document.getElementById('send-email').checked && !document.getElementById('send-email').disabled) targets.emailWebhookUrl = integ.emailWebhookUrl;
+
+  try{
+    const r = await fetch('/api/ai', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'crmSend', lead, businessProfile: getProfile(), targets })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    const res = data.resultados;
+    let lines = [];
+    if(res.crm) lines.push('CRM: ' + (res.crm.skipped ? 'não enviado' : (res.crm.ok ? 'OK' : 'falhou — ' + (res.crm.error || res.crm.status))));
+    if(res.whatsapp) lines.push('WhatsApp: ' + (res.whatsapp.ok ? 'OK' : 'falhou — ' + (res.whatsapp.error || res.whatsapp.status)));
+    if(res.email) lines.push('Email: ' + (res.email.ok ? 'OK' : 'falhou — ' + (res.email.error || res.email.status)));
+    statusEl.innerHTML = lines.join('<br>');
+    statusEl.className = 'status-line ok';
+  }catch(e){
+    statusEl.textContent = 'Erro: ' + e.message;
+    statusEl.className = 'status-line err';
+  }
+}
+
+async function openCadence(i){
+  const lead = currentLeads[i];
+  const { baseId, tableId } = getAirtable();
+  const idioma = document.getElementById('sc-lang').value;
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = 'Cadência de follow-up omnichannel — 21 dias';
+  document.getElementById('m-body').innerHTML = 'A desenhar a cadência de 21 dias…';
+  document.getElementById('modal-bg').classList.add('show');
+
+  try{
+    const r = await fetch('/api/ai', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'cadence', lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderCadence(data);
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderCadence(data){
+  const body = document.getElementById('m-body');
+  let html = '';
+  (data.cadencia || []).forEach((t) => {
+    let content = '';
+    if(t.whatsapp) content += 'WhatsApp:\n' + t.whatsapp + '\n\n';
+    if(t.roteiroLigacao) content += 'Ligação (abertura):\n' + t.roteiroLigacao + '\n\n';
+    if(t.emailAssunto) content += 'Email — ' + t.emailAssunto + ':\n' + t.emailCorpo;
+    html += '<div class="block"><div class="label"><span>Dia ' + t.dia + ' — ' + esc((t.canais||[]).join(' + ')) + '</span>' +
+      '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(content.trim()) + '">copiar</button></div>' +
+      '<pre>' + esc(content.trim()) + '</pre></div>';
+  });
+  if(data.regraParagem){
+    html += '<div class="block"><div class="label">Regra de paragem</div><pre>' + esc(data.regraParagem.descricao) +
+      '\n\nEsta regra tem de ser implementada no teu n8n (ouvir respostas inbound e cancelar os toques seguintes). Payload de exemplo para a tarefa de CRM:\n\n' +
+      esc(JSON.stringify(data.regraParagem.crmPayload, null, 2)) + '</pre></div>';
+  }
+  body.innerHTML = html;
+}
+
+async function openReport(){
+  const { baseId, tableId } = getAirtable();
+  if(!baseId || !tableId) return alert('Configura a base Airtable primeiro (passo 2).');
+
+  document.getElementById('m-empresa').textContent = 'Relatório Executivo';
+  document.getElementById('m-sub').textContent = 'Métricas reais do pipeline — sem números inventados';
+  document.getElementById('m-body').innerHTML = 'A calcular métricas e a gerar o relatório…';
+  document.getElementById('modal-bg').classList.add('show');
+
+  const custoMensal = window.prompt('Custo mensal do sistema (Apify + Anthropic + ferramentas), em €. Deixa vazio para saltar o cálculo de ROI/CPL:', '');
+
+  try{
+    let url = '/api/report?baseId=' + encodeURIComponent(baseId) + '&tableId=' + encodeURIComponent(tableId);
+    if(custoMensal) url += '&custoMensal=' + encodeURIComponent(custoMensal);
+    const r = await fetch(url);
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderReport(data);
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderReport(data){
+  const body = document.getElementById('m-body');
+  const s = data.stats;
+  let html = '<div class="block"><div class="label">Relatório</div><pre>' + esc(data.narrative) + '</pre></div>';
+
+  if(s){
+    html += '<div class="block"><div class="label">Números reais</div><pre>' +
+      'Total de leads: ' + s.totalLeads + '\n' +
+      'Por status: ' + esc(JSON.stringify(s.porStatus)) + '\n' +
+      'Por classificação: ' + esc(JSON.stringify(s.porClassificacao)) + '\n' +
+      'ICP Score médio: ' + (s.icpScoreMedio ?? '—') + '\n' +
+      'Intent Score médio: ' + (s.intentScoreMedio ?? '—') + '\n' +
+      '% enriquecidos: ' + s.percentEnriquecido + '%\n' +
+      '% com abordagem gerada: ' + s.percentComAbordagemGerada + '%\n' +
+      'Negócios ganhos: ' + s.negociosGanhos + ' (valor total: ' + (s.valorTotalGanho ?? '—') + ')\n' +
+      'Negócios perdidos: ' + s.negociosPerdidos + '\n' +
+      'ROI: ' + (s.roiPercent !== null ? s.roiPercent + '%' : 'dados insuficientes') + '\n' +
+      'Custo por lead: ' + (s.custoPorLead !== null ? '€' + s.custoPorLead : 'dados insuficientes') +
+      '</pre></div>';
+
+    if(s.dadosInsuficientesPara && s.dadosInsuficientesPara.length){
+      html += '<div class="block"><div class="label">O que não foi calculado (e porquê)</div><pre>' +
+        esc(s.dadosInsuficientesPara.join('\n')) + '</pre></div>';
+    }
+  }
+  body.innerHTML = html;
+}
+
+async function openOutreach(i){
+  const lead = currentLeads[i];
+  const { baseId, tableId } = getAirtable();
+  const idioma = document.getElementById('sc-lang').value;
+  document.getElementById('m-empresa').textContent = lead.Empresa || 'Lead';
+  document.getElementById('m-sub').textContent = lead['Dor Identificada'] || '';
+  document.getElementById('m-body').innerHTML = 'A gerar abordagens com IA…';
+  document.getElementById('modal-bg').classList.add('show');
+
+  try{
+    const r = await fetch('/api/ai', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type: 'outreach', lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error);
+    renderOutreach(data);
+  }catch(e){
+    document.getElementById('m-body').innerHTML = '<div class="status-line err">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderOutreach(data){
+  const m = data.messages;
+  const p = data.webhookPayloads;
+  const body = document.getElementById('m-body');
+  const block = (label, text, idSuffix) => (
+    '<div class="block"><div class="label"><span>' + label + '</span>' +
+    '<button class="copy-btn" onclick="copyText(this)" data-text="' + attrEsc(text) + '">copiar</button></div>' +
+    '<pre id="txt-' + idSuffix + '">' + esc(text) + '</pre></div>'
+  );
+  let html = '';
+  html += block('WhatsApp — abertura de curiosidade', m.whatsapp1, 'w1');
+  html += block('WhatsApp — foco em ROI', m.whatsapp2, 'w2');
+  html += block('Email — assunto', m.emailAssunto, 'ea');
+  html += block('Email — corpo', m.emailCorpo, 'eb');
+  html += block('Script de ligação', m.scriptLigacao, 'sl');
+  html += '<details class="payloads"><summary>Ver payloads de webhook (n8n / Z-API / Resend / CRM)</summary>' +
+    '<div class="block"><div class="label">WhatsApp (Z-API / Evolution)</div><pre>' + esc(JSON.stringify(p.whatsapp, null, 2)) + '</pre></div>' +
+    '<div class="block"><div class="label">Email (Resend / SendGrid)</div><pre>' + esc(JSON.stringify(p.email, null, 2)) + '</pre></div>' +
+    '<div class="block"><div class="label">Tarefa CRM (HubSpot / Pipedrive)</div><pre>' + esc(JSON.stringify(p.crm, null, 2)) + '</pre></div>' +
+    '</details>';
+  body.innerHTML = html;
+}
+
+function attrEsc(s){ return esc(s).replace(/\n/g, '&#10;'); }
+function copyText(btn){
+  const text = btn.getAttribute('data-text').replace(/&#10;/g, '\n');
+  navigator.clipboard.writeText(text);
+  const orig = btn.textContent;
+  btn.textContent = 'copiado!';
+  setTimeout(() => btn.textContent = orig, 1200);
+}
+
+function closeModal(){ document.getElementById('modal-bg').classList.remove('show'); }
+document.getElementById('modal-bg').addEventListener('click', e => { if(e.target.id === 'modal-bg') closeModal(); });
+</script>
+</body>
+</html>
