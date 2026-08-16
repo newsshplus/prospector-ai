@@ -140,9 +140,34 @@
   .close-x{ float:right; background:none; border:none; font-size:20px; color:var(--muted); cursor:pointer; }
   details.payloads{ margin-top:6px; }
   details.payloads summary{ cursor:pointer; font-size:12px; color:var(--navy-mid); font-weight:600; }
+
+  .login-gate{
+    position:fixed; inset:0; background:linear-gradient(135deg,var(--navy-deep),var(--navy-mid));
+    display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;
+  }
+  .login-gate.hide{ display:none; }
+  .login-box{ background:#fff; border-radius:16px; padding:32px; max-width:340px; width:100%; }
+  .login-box h1{ margin:0 0 4px; font-size:20px; color:var(--navy-deep); }
+  .login-box p{ margin:0 0 18px; color:var(--muted); font-size:13px; }
+  .login-box input{ margin-bottom:10px; }
+  .login-box button{ width:100%; }
+  #app-root{ display:none; }
+  #app-root.show{ display:block; }
 </style>
 </head>
 <body>
+
+<div class="login-gate" id="login-gate">
+  <div class="login-box">
+    <h1>🔒 Prospector AI</h1>
+    <p>Este painel usa IA paga (Claude/Groq) — acesso restrito.</p>
+    <input id="login-password" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="btn-primary" onclick="doLogin()">Entrar</button>
+    <div id="login-status" class="status-line"></div>
+  </div>
+</div>
+
+<div id="app-root">
 
 <header class="top">
   <div class="brand">
@@ -152,6 +177,7 @@
       <p>Deep matching · ICP score · outreach omnichannel</p>
     </div>
   </div>
+  <button class="btn-ghost btn-small" style="color:#fff; border-color:rgba(255,255,255,.4);" onclick="doLogout()">Sair</button>
 </header>
 
 <main>
@@ -234,11 +260,59 @@
   </div>
 </div>
 
+</div><!-- /#app-root -->
+
 <script>
 const LS = {
   profile: 'pai_profile',
   airtable: 'pai_airtable',
 };
+
+async function doLogin(){
+  const password = document.getElementById('login-password').value;
+  const statusEl = document.getElementById('login-status');
+  if(!password) return;
+  statusEl.textContent = 'A entrar…';
+  statusEl.className = 'status-line';
+  try{
+    const r = await fetch('/api/auth', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ password })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error || 'Password incorreta.');
+    document.getElementById('login-gate').classList.add('hide');
+    document.getElementById('app-root').classList.add('show');
+    restoreProfile();
+    restoreAirtable();
+    loadLeads();
+  }catch(e){
+    statusEl.textContent = e.message;
+    statusEl.className = 'status-line err';
+  }
+}
+
+async function doLogout(){
+  try{ await fetch('/api/auth', { method:'DELETE' }); }catch{}
+  document.getElementById('app-root').classList.remove('show');
+  document.getElementById('login-gate').classList.remove('hide');
+  document.getElementById('login-password').value = '';
+}
+
+// Se já existir sessão válida (cookie ainda não expirou), tenta entrar direto
+// chamando qualquer endpoint protegido leve; se der 401, mostra o login.
+(async function checkSession(){
+  try{
+    const r = await fetch('/api/leads?baseId=x&tableId=x');
+    if(r.status !== 401){
+      document.getElementById('login-gate').classList.add('hide');
+      document.getElementById('app-root').classList.add('show');
+      restoreProfile();
+      restoreAirtable();
+      loadLeads();
+    }
+  }catch{}
+})();
 
 function loadJSON(key, fallback){ try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; } }
 function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
@@ -294,9 +368,9 @@ async function discoverNiches(){
 
   wrap.innerHTML = '<div class="status-line">A analisar o perfil e a descobrir nichos…</div>';
   try{
-    const r = await fetch('/api/discover-niches', {
+    const r = await fetch('/api/ai', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ businessProfile: profile, localizacao })
+      body: JSON.stringify({ type: 'discoverNiches', businessProfile: profile, localizacao })
     });
     const data = await r.json();
     if(!r.ok) throw new Error(data.error);
@@ -496,9 +570,9 @@ async function openEnrich(i){
   document.getElementById('modal-bg').classList.add('show');
 
   try{
-    const r = await fetch('/api/enrich', {
+    const r = await fetch('/api/ai', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lead, businessProfile: getProfile(), baseId, tableId, recordId: lead.id })
+      body: JSON.stringify({ type: 'enrich', lead, businessProfile: getProfile(), baseId, tableId, recordId: lead.id })
     });
     const data = await r.json();
     if(!r.ok) throw new Error(data.error);
@@ -533,9 +607,9 @@ async function openDeliverability(i){
   document.getElementById('modal-bg').classList.add('show');
 
   try{
-    const r = await fetch('/api/deliverability', {
+    const r = await fetch('/api/ai', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+      body: JSON.stringify({ type: 'deliverability', lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
     });
     const data = await r.json();
     if(!r.ok) throw new Error(data.error);
@@ -591,9 +665,9 @@ async function openObjections(i){
   document.getElementById('modal-bg').classList.add('show');
 
   try{
-    const r = await fetch('/api/objections', {
+    const r = await fetch('/api/ai', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+      body: JSON.stringify({ type: 'objections', lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
     });
     const data = await r.json();
     if(!r.ok) throw new Error(data.error);
@@ -628,9 +702,9 @@ async function openCadence(i){
   document.getElementById('modal-bg').classList.add('show');
 
   try{
-    const r = await fetch('/api/cadence', {
+    const r = await fetch('/api/ai', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+      body: JSON.stringify({ type: 'cadence', lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
     });
     const data = await r.json();
     if(!r.ok) throw new Error(data.error);
@@ -721,9 +795,9 @@ async function openOutreach(i){
   document.getElementById('modal-bg').classList.add('show');
 
   try{
-    const r = await fetch('/api/outreach', {
+    const r = await fetch('/api/ai', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
+      body: JSON.stringify({ type: 'outreach', lead, businessProfile: getProfile(), idioma, baseId, tableId, recordId: lead.id })
     });
     const data = await r.json();
     if(!r.ok) throw new Error(data.error);
@@ -767,10 +841,6 @@ function copyText(btn){
 
 function closeModal(){ document.getElementById('modal-bg').classList.remove('show'); }
 document.getElementById('modal-bg').addEventListener('click', e => { if(e.target.id === 'modal-bg') closeModal(); });
-
-restoreProfile();
-restoreAirtable();
-loadLeads();
 </script>
 </body>
 </html>
